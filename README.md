@@ -1,4 +1,4 @@
-# WalkerTECH AI-Financer Pro v2.1
+# WalkerTECH AI-Financer Pro v1.0
 
 WalkerTECH AI-Financer Pro é uma plataforma de análise financeira inteligente que utiliza inteligência artificial para ajudar você a tomar melhores decisões de investimento.
 
