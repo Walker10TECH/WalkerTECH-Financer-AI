@@ -1,74 +1,100 @@
-## Manual do Usuário do WalkerTECH AI-Financer Pro v1.0
+# WalkerTECH AI-Financer Pro v1.0
 
+WalkerTECH AI-Financer Pro é uma plataforma de análise financeira inteligente que utiliza inteligência artificial para ajudar você a tomar melhores decisões de investimento.
 
-Este manual irá guiá-lo através das funcionalidades do WalkerTECH AI-Financer Pro v2.1, utilizando as imagens fornecidas como referência.
+## 🧠 Visão Geral
 
-### Visão Geral
+O AI-Financer Pro oferece uma interface intuitiva para simulações, comparações e análises financeiras personalizadas com base no seu perfil de investidor. Com integração de gráficos interativos (Plotly), análise macroeconômica, pesquisa web (Beta) e suporte a múltiplas instituições financeiras, a plataforma é ideal para investidores iniciantes e avançados.
 
-O WalkerTECH AI-Financer Pro v1.0 é uma ferramenta inteligente para auxiliar em suas decisões financeiras. Através de uma interface intuitiva e com o poder da inteligência artificial, você pode comparar investimentos, obter projeções, criar gráficos de alocação e muito mais.
+## 📸 Capturas de Tela
 
-### Funcionalidades Principais
+### 📍 Tela Inicial
 
-**Imagem 1: Tela Inicial - Seu Assistente Financeiro**
+![Tela Inicial](https://github.com/user-attachments/assets/741d26cf-5dfa-4020-a3c5-3a1d507b7ea1)
 
-Ao acessar o WalkerTECH AI-Financer Pro v2.1, você será recebido pela tela inicial.
+- Saudação personalizada com a instituição financeira selecionada (ex: Sicredi)
+- Opções rápidas de análise:
+  - Comparação de CDBs e LCIs
+  - Projeções da Selic (via Web)
+  - Gráfico de alocação ideal
+  - Tabela comparativa de fundos
+  - Análise macroeconômica
+- Entrada de comandos via texto ou voz
+- Barra de busca para perguntas livres
 
+---
 
-* **Olá, investidor do [Instituição Financeira Selecionada]:** Esta seção personaliza a experiência com o nome da sua instituição financeira (no caso da imagem, Sicredi). No canto superior direito, você pode ver a instituição selecionada e um menu dropdown para trocar (detalhado na Imagem 2).
-* **Em que posso auxiliar hoje?:** Esta é a pergunta central, convidando você a interagir com as funcionalidades da plataforma. Abaixo, você encontrará diversas opções pré-definidas para iniciar sua análise:
-    * **Compare CDBs e LCIs para meu perfil (com tabela e gráfico Plotly):** Permite comparar diferentes opções de renda fixa de acordo com seu perfil de investidor, apresentando os dados em formato de tabela e gráfico interativo Plotly(AINDA EM BETA).
-    * **Qual a projeção da Selic para os próximos 6 meses? (com pesquisa web):** Utiliza a pesquisa na web para fornecer as projeções mais recentes da taxa Selic para os próximos meses.
-    * **Crie um gráfico de pizza da minha alocação ideal (40% RF, 30% Ações, 20% FIls, 10% Global) com Plotly:** Permite visualizar sua alocação de ativos ideal em um gráfico de pizza interativo gerado com Plotly. Os percentuais apresentados são apenas um exemplo.
-    * **Me ajude a criar uma tabela comparativa de fundos de investimento com Plotly:** Facilita a comparação de diferentes fundos de investimento, apresentando dados relevantes em uma tabela comparativa e, opcionalmente, em gráficos Plotly.
-    * **Como o cenário macroeconômico atual afeta meus investimentos?:** Oferece uma análise do impacto do cenário macroeconômico atual em seus investimentos.
-* **Barra de Pesquisa:** Na parte inferior, você encontra uma barra de pesquisa onde pode digitar suas próprias perguntas e solicitar análises personalizadas sobre finanças, mercados ou investimentos.
-* **Ícone de Microfone:** Permite inserir sua pergunta por meio de comandos de voz.
-* **Ícone de Enviar:** Após digitar ou falar sua pergunta, clique neste ícone para enviar sua solicitação.
+### 🏦 Seleção de Instituição
 
-**Imagem 2: Menu de Seleção de Instituição Financeira**
+![Menu de Seleção](https://github.com/user-attachments/assets/cf855b69-f8dc-40fd-846d-3072fa1c199c)
 
-Ao clicar no nome da instituição financeira no canto superior direito da tela inicial (no caso, "Sicredi"), um menu dropdown é exibido.
+- Dropdown com instituições financeiras populares:
+  - Sicredi, Sicoob, Banco do Brasil, PicPay, Itaú, Bradesco, Santander
+- Escolha afeta as recomendações e análises geradas
 
-* Este menu lista diversas instituições financeiras (Sicredi, Sicoob, Banco do Brasil, PicPay, Itaú Unibanco, Bradesco, Santander).
-* Selecione a instituição financeira com a qual você possui relacionamento para obter informações e análises mais personalizadas.
+---
 
+### ⚙️ Configurações Gerais
 
-**Imagem 3: Tela de Configurações Gerais**
+- Acesse pelo ícone de engrenagem no menu lateral
+- Preferências disponíveis:
+  - Tema (Claro ou Escuro)
+  - Idioma (ex: Português - Brasil)
+- Botão para salvar as configurações
 
-Para acessar as configurações gerais, clique no ícone de engrenagem localizado na barra lateral esquerda.
+---
 
-* **Configurações Gerais:** Esta é a seção principal para ajustar as preferências do aplicativo.
-* **Ajustes gerais do aplicativo:** Uma breve descrição do que pode ser configurado nesta tela.
-* **Preferências de Interface:** Permite personalizar a aparência do aplicativo.
-    * **Tema:** Oferece opções de tema claro ou escuro (no caso, "Escuro (Padrão)" está selecionado).
-    * **Idioma:** Permite escolher o idioma de exibição do aplicativo (no caso, "Português (Brasil)" está selecionado).
-    * **Salvar Configurações:** Clique neste botão para aplicar as alterações feitas nas preferências de interface.
+### 📊 Menu Lateral
 
-**Imagem 4: Menu Lateral - Opções Adicionais**
+- Navegação rápida entre funcionalidades:
+  - Meu Perfil
+  - Preferências de Análise
+  - Configurações
+  - Seleção do modelo de IA (ex: Gemini 1.5 Pro)
+  - Ativação da pesquisa Web (Beta)
+  - Histórico, Chat, Ajuda e Logout
 
-A barra lateral esquerda oferece acesso a outras funcionalidades e configurações do aplicativo.
+---
 
-* **Ícone de Usuário:** Acesso ao seu perfil (Meu Perfil).
-* **Ícone de Gráfico/Filtro:** Acesso às preferências de análise (Preferências de Análise), detalhado na Imagem 5.
-* **Ícone de Engrenagem:** Acesso às configurações gerais (Configurações Gerais), detalhado na Imagem 3.
-* **Modelo de IA:** Permite selecionar o modelo de inteligência artificial utilizado para as análises (no caso, "Gemini 1.5 Pro" está selecionado).
-* **Pesquisa Web (Beta):** Ativa ou desativa a funcionalidade de pesquisa na web para complementar as análises (no caso, está desativada).
-* **Ícone de Interrogação:** Acesso à Ajuda e Suporte.
-* **Ícone de Sair:** Permite sair da sua conta.
-* **Ícone de Histórico:** Acesso ao seu histórico de interações.
-* **Ícone de Chat:** Retorna à tela inicial de conversa.
+### 🧩 Preferências de Análise
 
-**Imagem 5: Tela de Preferências de Análise**
+- Personalização do perfil de investidor:
+  - Tolerância ao risco (Conservador, Moderado, Arrojado)
+  - Horizonte de investimento (Curto, Médio, Longo Prazo)
+- As preferências influenciam diretamente nas análises e simulações
 
-Ao clicar em "Preferências de Análise" no menu lateral, você pode personalizar como a IA analisa e sugere investimentos.
+---
 
-* **Preferências de Análise:** O título da seção.
-* **Personalize como a IA analisa e sugere investimentos (salvas localmente):** Uma descrição de como as preferências definidas nesta tela influenciam as análises.
-* **Seu Perfil de Investidor:** Permite definir seu perfil de investidor.
-    * **Tolerância a Risco:** Um menu dropdown para selecionar seu nível de tolerância ao risco (Conservador, Moderado, Arrojado, etc.). No caso, "Moderado" está selecionado.
-    * **Horizonte de Investimento:** Um menu dropdown para selecionar seu horizonte de investimento (Curto Prazo, Médio Prazo, Longo Prazo, etc.). No caso, "Longo Prazo (5+ anos)" está selecionado.
-    * **Salvar Preferências:** Clique neste botão para salvar as suas preferências de análise.
+## ✅ Funcionalidades
 
-### Conclusão
+- 🧮 Comparações inteligentes entre ativos de renda fixa
+- 📈 Gráficos com Plotly (interativos e responsivos)
+- 🌎 Análises com dados atualizados da Web (Beta)
+- 🔄 Personalização de interface e perfil de investidor
+- 🤖 Suporte a múltiplos modelos de IA
 
-O WalkerTECH AI-Financer Pro v2.1 oferece um conjunto abrangente de ferramentas para auxiliar em suas decisões financeiras. Explore as funcionalidades, personalize as configurações e aproveite o poder da inteligência artificial para otimizar seus investimentos. Em caso de dúvidas, consulte a seção de Ajuda e Suporte.
+## 🚀 Requisitos
+
+- Navegador moderno
+- Conexão com a internet
+- Conta em uma instituição financeira compatível (opcional)
+
+## 🧰 Tecnologias Utilizadas
+
+- React (interface)
+- Plotly.js (gráficos)
+- Gemini API (modelo de IA)
+- Web Search (Beta)
+
+## 🆘 Suporte
+
+- Acesse o ícone de interrogação no menu lateral
+- FAQ e canal de contato com o suporte disponíveis
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT.
+
+---
+
+© 2025 WalkerTECH. Todos os direitos reservados.
