@@ -1,9 +1,5 @@
 ## Manual do Usuário do WalkerTECH AI-Financer Pro v1.0
-![Captura de tela 2025-05-14 151352](https://github.com/user-attachments/assets/76b41cda-9994-4af6-9f03-4d60dc8ab647)
-![Captura de tela 2025-05-14 151325](https://github.com/user-attachments/assets/5771ddc4-07f4-4fc8-a6ce-b58249b94cef)
-![Captura de tela 2025-05-14 151310](https://github.com/user-attachments/assets/dcee5b5b-3b28-437d-8965-f0d14cff73a4)
-![Captura de tela 2025-05-14 151252](https://github.com/user-attachments/assets/6f56f48c-05ab-4352-9fa7-f82ebc651ff2)
-![Captura de tela 2025-05-14 151239](https://github.com/user-attachments/assets/3070e575-dbe1-43f2-9e94-33e6d41c9e96)
+
 
 Este manual irá guiá-lo através das funcionalidades do WalkerTECH AI-Financer Pro v2.1, utilizando as imagens fornecidas como referência.
 
@@ -16,6 +12,7 @@ O WalkerTECH AI-Financer Pro v1.0 é uma ferramenta inteligente para auxiliar em
 **Imagem 1: Tela Inicial - Seu Assistente Financeiro**
 
 Ao acessar o WalkerTECH AI-Financer Pro v2.1, você será recebido pela tela inicial.
+
 
 * **Olá, investidor do [Instituição Financeira Selecionada]:** Esta seção personaliza a experiência com o nome da sua instituição financeira (no caso da imagem, Sicredi). No canto superior direito, você pode ver a instituição selecionada e um menu dropdown para trocar (detalhado na Imagem 2).
 * **Em que posso auxiliar hoje?:** Esta é a pergunta central, convidando você a interagir com as funcionalidades da plataforma. Abaixo, você encontrará diversas opções pré-definidas para iniciar sua análise:
