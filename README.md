@@ -1,91 +1,61 @@
-# WalkerTECH AI-Financer Pro v1.0
+# WalkerTECH-AI-Financer V1.0
 
-WalkerTECH AI-Financer Pro é uma plataforma de análise financeira inteligente que utiliza inteligência artificial para ajudar você a tomar melhores decisões de investimento.
+## Uma Inteligência Artificial para Investidores
 
-## 🧠 Visão Geral
+Este é o README do seu assistente financeiro inteligente, WalkerTECH-AI-Financer. Aqui você encontrará informações sobre como interagir com a IA e aproveitar ao máximo seus recursos.
 
-O AI-Financer Pro oferece uma interface intuitiva para simulações, comparações e análises financeiras personalizadas com base no seu perfil de investidor. Com integração de gráficos interativos (Plotly), análise macroeconômica, pesquisa web (Beta) e suporte a múltiplas instituições financeiras, a plataforma é ideal para investidores iniciantes e avançados.
+## Visão Geral
 
-## 📸 Capturas de Tela
+WalkerTECH-AI-Financer é uma ferramenta projetada para auxiliar investidores com informações, análises e insights sobre o mundo das finanças. Através de uma interface intuitiva, você pode fazer perguntas, explorar tópicos financeiros e visualizar dados relevantes para suas decisões de investimento.
 
-### 📍 Tela Inicial
+## Primeiros Passos
 
-![Tela Inicial](https://github.com/user-attachments/assets/741d26cf-5dfa-4020-a3c5-3a1d507b7ea1)
+1.  **Interface Inicial:** Ao acessar a IA, você será recebido com uma mensagem amigável ("Olá, Investidor!") e algumas sugestões de perguntas para iniciar a conversa (Imagem 1). Clique em uma delas ou digite sua própria pergunta na barra inferior.
+ ![Captura de tela 2025-05-17 164748](https://github.com/user-attachments/assets/5c842f45-2882-4015-bcbf-82bc323250be)
 
-- Saudação personalizada com a instituição financeira selecionada (ex: Sicredi)
-- Opções rápidas de análise:
-  - Comparação de CDBs e LCIs
-  - Projeções da Selic (via Web)
-  - Gráfico de alocação ideal
-  - Tabela comparativa de fundos
-  - Análise macroeconômica
-- Entrada de comandos via texto ou voz
-- Barra de busca para perguntas livres
 
----
+3.  **Personalização:**
+   ![Captura de tela 2025-05-17 164756](https://github.com/user-attachments/assets/142c1eb8-cf85-46a1-8b35-0dac0ef53915)
+![Captura de tela 2025-05-17 164843](https://github.com/user-attachments/assets/c49e7078-fa48-480d-9639-6cb82578e2ad)
+   ![Captura de tela 2025-05-17 164801](https://github.com/user-attachments/assets/6116bc3d-0861-4781-8206-cfefe040bae8)
 
-### 🏦 Seleção de Instituição
 
-![Menu de Seleção](https://github.com/user-attachments/assets/cf855b69-f8dc-40fd-846d-3072fa1c199c)
+    * **Tema:** Personalize a aparência da IA escolhendo entre um tema claro e um tema escuro através das **Opções Rápidas** (Imagem 2).
+    * **Banco:** Selecione seu banco preferido em **Opções Rápidas** (Imagem 2 e 7). Essa informação pode ajudar a IA a fornecer respostas mais contextuais no futuro.
+    * **Modelo IA:** Atualmente, a IA está rodando no modelo **Gemini 1.5 Flash**. Futuramente, você poderá escolher entre diferentes modelos de IA com diferentes capacidades (Imagem 3).
+    * Não se esqueça de clicar em **Confirmar Opções** para salvar suas preferências (Imagem 2).
 
-- Dropdown com instituições financeiras populares:
-  - Sicredi, Sicoob, Banco do Brasil, PicPay, Itaú, Bradesco, Santander
-- Escolha afeta as recomendações e análises geradas
+## Interagindo com a IA
+![Captura de tela 2025-05-17 165006](https://github.com/user-attachments/assets/35b077f2-37ff-4698-b92b-20d7aa713005)
 
----
+* **Barra de Pergunta:** Digite suas perguntas sobre finanças na barra de texto localizada na parte inferior da tela (Imagem 1 e 8). Seja o mais específico possível para obter respostas relevantes.
+* **Enviar:** Clique no ícone de envio (seta roxa) para enviar sua pergunta para a IA.
 
-### ⚙️ Configurações Gerais
+## Recursos e Funcionalidades
 
-- Acesse pelo ícone de engrenagem no menu lateral
-- Preferências disponíveis:
-  - Tema (Claro ou Escuro)
-  - Idioma (ex: Português - Brasil)
-- Botão para salvar as configurações
 
----
-![Captura de tela 2025-05-16 182149](https://github.com/user-attachments/assets/8f504281-bee1-4f8b-83ba-21f8bc837f21)
-![Captura de tela 2025-05-16 182140](https://github.com/user-attachments/assets/e0c93390-41c8-4d23-a5ac-d7ef6f2deb66)
+* **Sugestões de Perguntas:** A tela inicial oferece algumas perguntas comuns para você começar a explorar diferentes tópicos financeiros (Imagem 1).
+* **Configurações Avançadas:**
+    * **Pesquisa Web (Contexto):** Ative essa opção para permitir que a IA busque informações atualizadas na web para complementar suas respostas (Imagem 4). Isso pode fornecer insights mais recentes e detalhados.
+    * **Salvar Config. Pesquisa:** Salve suas preferências para a pesquisa web.
+* **Histórico de Chats:** Revise suas conversas anteriores para relembrar informações e insights (Imagem 5).
+* **Meu Perfil:** Visualize suas informações básicas, como nome, e-mail e plano atual (Imagem 6).
+* **Visualização de Dados:** A IA pode apresentar dados complexos através de gráficos intuitivos, como gráficos de pizza (Imagem 8), para facilitar a compreensão e análise. Basta solicitar uma visualização ao fazer sua pergunta.
 
-### 📊 Menu Lateral
+## Exemplos de Perguntas
 
-- Navegação rápida entre funcionalidades:
-  - Meu Perfil
-  - Configurações
-  - Preferencias de Análise
-  -historico
+Aqui estão alguns exemplos de perguntas que você pode fazer:
 
----
+* "Qual a perspectiva para a inflação no Brasil nos próximos meses?"
+* "Como diversificar minha carteira de investimentos com um perfil de risco moderado?"
+* "Explique o funcionamento dos fundos de renda fixa."
+* "Me mostre um gráfico da evolução da Taxa Selic nos últimos 5 anos." (Se aplicável, a IA pode gerar visualizações)
+* "Quais são os principais riscos de investir em criptomoedas?"
 
-## ✅ Funcionalidades
+## Feedback e Melhorias
 
-- 🧮 Comparações inteligentes entre ativos de renda fixa
-- 📈 Gráficos com Plotly (interativos e responsivos)
-- 🌎 Análises com dados atualizados da Web (Beta)
-- 🔄 Personalização de interface e perfil de investidor
-- 🤖 Suporte a múltiplos modelos de IA
+Esta é uma versão inicial da WalkerTECH-AI-Financer, e estamos constantemente trabalhando para melhorar seus recursos e funcionalidades. Se você tiver algum feedback ou sugestão, por favor, nos informe!
 
-## 🚀 Requisitos
+## Comece a Explorar!
 
-- Navegador moderno
-- Conexão com a internet
-- Conta em uma instituição financeira compatível (opcional)
-
-## 🧰 Tecnologias Utilizadas
-
-- React (interface)
-- Plotly.js (gráficos)
-- Gemini API (modelo de IA)
-- Web Search (Beta)
-
-## 🆘 Suporte
-
-- Acesse o ícone de interrogação no menu lateral
-- FAQ e canal de contato com o suporte disponíveis
-
-## 📄 Licença
-
-Este projeto está licenciado sob a Licença MIT.
-
----
-
-© 2025 WalkerTECH. Todos os direitos reservados.
+Sinta-se à vontade para interagir com a IA e descobrir como ela pode te ajudar a tomar decisões financeiras mais informadas e alcançar seus objetivos de investimento aqui em Cascavel e no Brasil.
