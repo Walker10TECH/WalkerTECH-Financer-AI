@@ -16,6 +16,9 @@ WalkerTECH-AI-Financer é uma ferramenta projetada para auxiliar investidores co
 
 3.  **Personalização:**
    ![Captura de tela 2025-05-17 164756](https://github.com/user-attachments/assets/142c1eb8-cf85-46a1-8b35-0dac0ef53915)
+![Captura de tela 2025-05-17 164843](https://github.com/user-attachments/assets/c49e7078-fa48-480d-9639-6cb82578e2ad)
+   ![Captura de tela 2025-05-17 164801](https://github.com/user-attachments/assets/6116bc3d-0861-4781-8206-cfefe040bae8)
+
 
     * **Tema:** Personalize a aparência da IA escolhendo entre um tema claro e um tema escuro através das **Opções Rápidas** (Imagem 2).
     * **Banco:** Selecione seu banco preferido em **Opções Rápidas** (Imagem 2 e 7). Essa informação pode ajudar a IA a fornecer respostas mais contextuais no futuro.
@@ -29,6 +32,7 @@ WalkerTECH-AI-Financer é uma ferramenta projetada para auxiliar investidores co
 * **Enviar:** Clique no ícone de envio (seta roxa) para enviar sua pergunta para a IA.
 
 ## Recursos e Funcionalidades
+
 
 * **Sugestões de Perguntas:** A tela inicial oferece algumas perguntas comuns para você começar a explorar diferentes tópicos financeiros (Imagem 1).
 * **Configurações Avançadas:**
