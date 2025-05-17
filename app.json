@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "WalkerTECH-Financer-AI",
-    "slug": "WalkerTECH-Financer-AI",
+    "slug": "walkertech-ia",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,8 +27,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "689b15bb-e349-4802-a8d7-99e0e0b0bb7e"
+        "projectId": "93865475-1f14-4f68-8d50-e141dee3561b"
       }
-    }
+    },
+    "owner": "willyan_10_walker"
   }
 }
