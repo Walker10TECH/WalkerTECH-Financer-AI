@@ -43,25 +43,16 @@ O AI-Financer Pro oferece uma interface intuitiva para simulações, comparaçõ
 - Botão para salvar as configurações
 
 ---
+![Captura de tela 2025-05-16 182149](https://github.com/user-attachments/assets/8f504281-bee1-4f8b-83ba-21f8bc837f21)
+![Captura de tela 2025-05-16 182140](https://github.com/user-attachments/assets/e0c93390-41c8-4d23-a5ac-d7ef6f2deb66)
 
 ### 📊 Menu Lateral
 
 - Navegação rápida entre funcionalidades:
   - Meu Perfil
-  - Preferências de Análise
   - Configurações
-  - Seleção do modelo de IA (ex: Gemini 1.5 Pro)
-  - Ativação da pesquisa Web (Beta)
-  - Histórico, Chat, Ajuda e Logout
-
----
-
-### 🧩 Preferências de Análise
-
-- Personalização do perfil de investidor:
-  - Tolerância ao risco (Conservador, Moderado, Arrojado)
-  - Horizonte de investimento (Curto, Médio, Longo Prazo)
-- As preferências influenciam diretamente nas análises e simulações
+  - Preferencias de Análise
+  -historico
 
 ---
 
