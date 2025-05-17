@@ -1,45 +1,69 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-    View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet,
-    Image, Modal, FlatList, Linking, Dimensions, Platform, AppState, ActivityIndicator,
-    KeyboardAvoidingView, StatusBar
-} from 'react-native';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { FunctionCallingMode, GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { WebView } from 'react-native-webview'; // Keep for native Recharts fallback
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import Markdown from 'react-native-markdown-display';
 import * as FileSystem from 'expo-file-system';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    AppState,
+    Dimensions,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Linking,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text, TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import * as Animatable from 'react-native-animatable';
+import Markdown from 'react-native-markdown-display';
 
-// Conditionally import Recharts for web
-let RechartsComponents = {};
+// --- Google Charts Import (for Web) ---
+let Chart;
 if (Platform.OS === 'web') {
     try {
-        const Recharts = require('recharts');
-        RechartsComponents = {
-            BarChart: Recharts.BarChart,
-            Bar: Recharts.Bar,
-            XAxis: Recharts.XAxis,
-            YAxis: Recharts.YAxis,
-            CartesianGrid: Recharts.CartesianGrid,
-            Tooltip: Recharts.Tooltip,
-            Legend: Recharts.Legend,
-            ResponsiveContainer: Recharts.ResponsiveContainer,
-        };
+        Chart = require('react-google-charts').Chart;
     } catch (e) {
-        console.warn("Recharts library not found for web. Charts may not render on web.", e);
+        console.warn("react-google-charts library not found. Charts will not render on web.", e);
+        Chart = null; // Ensure Chart is defined, even if null
     }
+}
+
+
+// --- Helper function for converting HEX to RGBA for boxShadow ---
+function hexToRgba(hex, opacity) {
+    if (!hex) return `rgba(0,0,0,${opacity || 0.1})`;
+    let r = 0, g = 0, b = 0;
+    if (hex.startsWith('#')) {
+        hex = hex.slice(1);
+    }
+    if (hex.length === 3) {
+        r = parseInt(hex[0] + hex[0], 16);
+        g = parseInt(hex[1] + hex[1], 16);
+        b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+        r = parseInt(hex[0] + hex[1], 16);
+        g = parseInt(hex[2] + hex[3], 16);
+        b = parseInt(hex[4] + hex[5], 16);
+    } else {
+        return `rgba(0,0,0,${opacity || 0.1})`; // Fallback for invalid hex
+    }
+    return `rgba(${r},${g},${b},${opacity})`;
 }
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // --- Screen Size Adaptation ---
-const IS_SMALL_SCREEN = screenWidth < 380;
+const IS_SMALL_SCREEN = screenWidth < 1080;
 const S_SF = IS_SMALL_SCREEN ? 0.85 : 1;
 const scale = (value) => Math.round(value * S_SF);
 const scaleFont = (value) => Math.round(value * S_SF);
@@ -58,7 +82,7 @@ const themes = {
         warning: '#FFD54F', info: '#4FC3F7', infoLink: '#4FC3F7', magenta: '#F48FB1', // Softer magenta
         statusBar: 'light-content', inputBg: '#2C2C2C', messageUserBg: '#3700B3', // Deep Purple
         messageUserText: '#FFFFFF', messageAiBg: '#2A2A2A', messageAiText: '#E0E0E0',
-        iconDefault: '#B0B0B0', iconMuted: '#888888', buttonText: '#FFFFFF', shadowColor: '#000',
+        iconDefault: '#B0B0B0', iconMuted: '#888888', buttonText: '#FFFFFF', shadowColor: '#000000',
         sidebarGradient: ['#3700B3', '#2C0B56', '#121212'], // User Message BG to Darker Purple to Primary BG
         inputBorderGradient: ['#BB86FC', '#03DAC6', '#CF6679'], // Accents + Danger
         greetingHeader: '#F48FB1', menuBg: '#1C1C1C',
@@ -101,11 +125,11 @@ const banksData = [
 ];
 
 const allEconomySuggestions = [
-    { text: "Crie uma tabela comparativa entre guardar dinheiro na poupança e viver apenas com o salário, destacando fatores como poder de compra, inflação, rendimento real, estabilidade, imprevistos, metas e segurança financeira.", borderColorThemeKey: "cardBorderGreen", icon: "account-balance" },
-    { text: "Compare diferentes tipos de aplicações financeiras no Brasil (Poupança, CDB, Tesouro Direto, Fundos, Ações) por rentabilidade, liquidez, risco, IR, mínimo e perfil.", borderColorThemeKey: "cardBorderYellow", icon: "storefront" },
-    { text: "Analise aposentadoria pública (INSS) vs. privada (PGBL/VGBL) no Brasil, considerando idade, contribuição, valor, teto, carência, tributação, flexibilidade, herança e riscos para CLT e autônomos.", borderColorThemeKey: "cardBorderBlue", icon: "trending-up" },
+    { text: "Crie uma tabela comparativa em Markdown entre guardar dinheiro na poupança e viver apenas com o salário, destacando fatores como poder de compra, inflação, rendimento real, estabilidade, imprevistos, metas e segurança financeira.", borderColorThemeKey: "cardBorderGreen", icon: "account-balance" },
+    { text: "Compare em formato de tabela Markdown diferentes tipos de aplicações financeiras no Brasil (Poupança, CDB, Tesouro Direto, Fundos, Ações) por rentabilidade, liquidez, risco, IR, mínimo e perfil.", borderColorThemeKey: "cardBorderYellow", icon: "storefront" },
+    { text: "Analise em formato de tabela Markdown aposentadoria pública (INSS) vs. privada (PGBL/VGBL) no Brasil, considerando idade, contribuição, valor, teto, carência, tributação, flexibilidade, herança e riscos para CLT e autônomos.", borderColorThemeKey: "cardBorderBlue", icon: "trending-up" },
     {
-        text: "Gere uma configuração ApexCharts para um gráfico de barras comparando o rendimento anual simulado de R$10.000 em Poupança (0.5% a.m.), CDB 100% CDI (CDI 10% a.a.) e Tesouro Selic (Selic 10% a.a.) por 3 anos. Forneça a configuração no formato JSON como instruído (incluindo 'text' e 'apex_chart_config' com 'options', 'series', 'type', 'height'). Use cores neutras para textos e grades, e cores vibrantes para as séries, visando boa legibilidade em temas claros e escuros. O gráfico deve ser do tipo 'bar', ter altura de aproximadamente 350px e a toolbar deve estar desabilitada.",
+        text: "Gere uma configuração para Google Charts (formato JSON com 'text' e 'google_chart_config') para um gráfico de barras comparando o rendimento anual simulado de R$10.000 em Poupança (0.5% a.m.), CDB 100% CDI (CDI 10% a.a.) e Tesouro Selic (Selic 10% a.a.) por 3 anos. 'google_chart_config' deve ter 'chartType' (ex: 'BarChart'), 'data' (array de arrays, primeira linha são cabeçalhos), 'options' (título, eixos, cores, etc.) e 'height' (aprox. '350px'). Use cores do tema para texto/grade e vibrantes para séries.",
         borderColorThemeKey: "warning",
         icon: "insert-chart"
     },
@@ -135,16 +159,16 @@ const allEconomySuggestions = [
 
 const AI_MODELS_DISPLAY = {
     "gemini-2.5-pro-preview-05-06": "Gemini 2.5 Pro (Preview)",
-    "gemini-2.0-flash": "Gemini 2.0 Flash", // This was in the first snippet, but not in second's GEMINI_MODEL_MAPPING
+    "gemini-2.0-flash": "Gemini 2.0 Flash",
     "gemini-1.5-flash": "Gemini 1.5 Flash",
     "gemini-1.5-pro": "Gemini 1.5 Pro",
 };
-const GEMINI_MODEL_MAPPING = { // From second snippet
+const GEMINI_MODEL_MAPPING = {
     "WalkerTECH_Pro_Max": "gemini-2.5-pro-preview-05-06",
     "WalkerTECH_1.5_Flash": "gemini-1.5-flash",
     "WalkerTECH_Compact": "gemini-1.5-pro",
 };
-const DEFAULT_MODEL_KEY = "WalkerTECH_Pro_Max";
+const DEFAULT_MODEL_KEY = "WalkerTECH_1.5_Flash";
 
 const MAX_FILE_SIZE_MB = 25;
 const MAX_HISTORY_ITEMS = 20;
@@ -152,176 +176,129 @@ const NUM_SUGGESTIONS_TO_DISPLAY = 4;
 
 let genAI;
 
-// --- RechartsDisplay Component ---
-const RechartsDisplay = ({ apexChartConfig, themeMode, height }) => {
-    const chartHeight = height || scale(300);
-    // const chartType = apexChartConfig.type || 'bar'; // chartType not directly used for Recharts rendering here
+// Gemini Tools for Function Calling (Web Search)
+const tools = [{
+    functionDeclarations: [
+        {
+            name: "perform_web_search",
+            description: "Realiza uma busca na web para encontrar informações atualizadas, dados específicos ou verificar fatos. Use esta ferramenta quando a consulta do usuário exigir conhecimento além dos seus dados de treinamento ou precisar de informações sobre eventos atuais.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    query: {
+                        type: "STRING",
+                        description: "A consulta de busca para encontrar informações na web."
+                    }
+                },
+                required: ["query"]
+            }
+        }
+    ]
+}];
 
-    const currentThemeColors = themes[themeMode]; // Renamed to avoid conflict with 'colors' in main component
-    const tickColor = currentThemeColors.textSecondary;
-    const gridStrokeColor = currentThemeColors.borderColor;
-    const legendTextColor = currentThemeColors.textPrimary;
-    const tooltipBgColor = themeMode === 'dark' ? 'rgba(30, 30, 30, 0.95)' : 'rgba(255, 255, 255, 0.98)';
-    const tooltipTextColor = currentThemeColors.textPrimary;
-    const tooltipBorderColor = currentThemeColors.dividerColor;
-
-    let rechartsData = [];
-    let seriesInfoForRecharts = [];
-    const defaultRechartsColors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-    const chartColors = apexChartConfig.options?.colors && apexChartConfig.options.colors.length > 0
-                        ? apexChartConfig.options.colors
-                        : defaultRechartsColors;
-
-    if (apexChartConfig.options?.xaxis?.categories && apexChartConfig.series) {
-        const categories = apexChartConfig.options.xaxis.categories;
-        rechartsData = categories.map((categoryName, index) => {
-            const dataPoint = { name: categoryName };
-            apexChartConfig.series.forEach((s, seriesIndex) => { // Added seriesIndex for unique key generation
-                const dataKey = (s.name || `series_${seriesIndex}`).replace(/[^a-zA-Z0-9_]/g, '_');
-                dataPoint[dataKey] = (s.data && typeof s.data[index] === 'number') ? s.data[index] : 0;
-            });
-            return dataPoint;
-        });
-
-        seriesInfoForRecharts = apexChartConfig.series.map((s, index) => ({
-            dataKey: (s.name || `series_${index}`).replace(/[^a-zA-Z0-9_]/g, '_'),
-            name: s.name || `Série ${index + 1}`,
-            fill: chartColors[index % chartColors.length],
-        }));
-    }
+// --- GoogleChartDisplay Component (for Web) ---
+const GoogleChartDisplay = ({ chartConfig, themeMode }) => {
+    const currentThemeColors = themes[themeMode];
 
     if (Platform.OS === 'web') {
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = RechartsComponents;
-
-        if (!BarChart) {
-            return <Text style={{color: tickColor, padding: 20, textAlign: 'center'}}>Recharts indisponível para web.</Text>;
+        if (!Chart) {
+            return <Text style={{color: currentThemeColors.textSecondary, padding: 20, textAlign: 'center', fontFamily: 'JetBrainsMono-Regular'}}>Google Charts indisponível (biblioteca não carregada).</Text>;
         }
-        if (rechartsData.length === 0 || seriesInfoForRecharts.length === 0) {
-            return <Text style={{color: tickColor, padding: 20, textAlign: 'center'}}>Dados insuficientes ou mal formatados para exibir o gráfico.</Text>;
+        if (!chartConfig || !chartConfig.data || chartConfig.data.length < 2 || !chartConfig.chartType) { // Data needs at least headers and one data row
+            return <Text style={{color: currentThemeColors.textSecondary, padding: 20, textAlign: 'center', fontFamily: 'JetBrainsMono-Regular'}}>Dados insuficientes ou mal formatados para exibir o gráfico (Google Charts).</Text>;
         }
 
-        const CustomTooltip = ({ active, payload, label }) => {
-            if (active && payload && payload.length) {
-              return (
-                <View style={{ backgroundColor: tooltipBgColor, padding: scale(10), borderRadius: scale(8), borderWidth: 1, borderColor: tooltipBorderColor, shadowColor: currentThemeColors.shadowColor, shadowOpacity: currentThemeColors.shadowOpacity, shadowRadius: scale(5), elevation: 3 }}>
-                  <Text style={{ marginVertical: 0, marginBottom: scale(5), fontWeight: 'bold', color: tooltipTextColor, fontFamily: 'Roboto-Bold' }}>{label}</Text>
-                  {payload.map((pld, index) => (
-                    <Text key={index} style={{ marginVertical: scale(3), color: pld.fill || pld.stroke || tooltipTextColor, fontFamily: 'JetBrainsMono-Regular' }}>
-                      {pld.name}: {typeof pld.value === 'number' ? pld.value.toLocaleString() : pld.value}
-                    </Text>
-                  ))}
-                </View>
-              );
+        // Adapt options for theme
+        const adaptedOptions = {
+            ...(chartConfig.options || {}),
+            backgroundColor: 'transparent', // Ensure chart background is transparent
+            titleTextStyle: {
+                ...(chartConfig.options?.titleTextStyle || {}),
+                color: currentThemeColors.textPrimary,
+                fontName: 'JetBrainsMono-Regular',
+            },
+            legend: {
+                ...(chartConfig.options?.legend || {}),
+                textStyle: {
+                    ...(chartConfig.options?.legend?.textStyle || {}),
+                    color: currentThemeColors.textPrimary,
+                    fontName: 'JetBrainsMono-Regular',
+                },
+            },
+            hAxis: {
+                ...(chartConfig.options?.hAxis || {}),
+                textStyle: {
+                    ...(chartConfig.options?.hAxis?.textStyle || {}),
+                    color: currentThemeColors.textSecondary,
+                    fontName: 'JetBrainsMono-Regular',
+                },
+                titleTextStyle: {
+                    ...(chartConfig.options?.hAxis?.titleTextStyle || {}),
+                    color: currentThemeColors.textPrimary,
+                    fontName: 'JetBrainsMono-Regular',
+                },
+                gridlines: {
+                    ...(chartConfig.options?.hAxis?.gridlines || {}),
+                    color: currentThemeColors.dividerColor,
+                },
+            },
+            vAxis: {
+                ...(chartConfig.options?.vAxis || {}),
+                textStyle: {
+                    ...(chartConfig.options?.vAxis?.textStyle || {}),
+                    color: currentThemeColors.textSecondary,
+                    fontName: 'JetBrainsMono-Regular',
+                },
+                titleTextStyle: {
+                    ...(chartConfig.options?.vAxis?.titleTextStyle || {}),
+                    color: currentThemeColors.textPrimary,
+                    fontName: 'JetBrainsMono-Regular',
+                },
+                gridlines: {
+                    ...(chartConfig.options?.vAxis?.gridlines || {}),
+                    color: currentThemeColors.dividerColor,
+                },
+            },
+            // Use theme accent colors if no colors are provided in the config
+            colors: chartConfig.options?.colors || [currentThemeColors.accentPrimary, currentThemeColors.accentSecondary, currentThemeColors.success, currentThemeColors.warning, currentThemeColors.magenta],
+            chartArea: {
+                ...(chartConfig.options?.chartArea || {}),
+                 backgroundColor: 'transparent', // Ensure chart area is transparent
+            },
+            tooltip: {
+                ...(chartConfig.options?.tooltip || {}),
+                textStyle: {
+                    ...(chartConfig.options?.tooltip?.textStyle || {}),
+                    fontName: 'JetBrainsMono-Regular',
+                    color: currentThemeColors.textPrimary, // Tooltip text
+                },
             }
-            return null;
-          };
+        };
+
+        const chartHeight = typeof chartConfig.height === 'string'
+            ? chartConfig.height
+            : (typeof chartConfig.height === 'number' ? `${chartConfig.height}px` : `${scale(320)}px`);
 
         return (
-            <View style={{ height: chartHeight, width: '100%' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={rechartsData} margin={{ top: 10, right: 20, left: Platform.OS === 'web' ? -5 : -10, bottom: 5 }} barGap={scale(8)}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={gridStrokeColor} />
-                        <XAxis dataKey="name" stroke={tickColor} tick={{ fontSize: scaleFont(11), fill: tickColor, fontFamily: 'Roboto-Regular' }} interval={0} />
-                        <YAxis stroke={tickColor} tick={{ fontSize: scaleFont(11), fill: tickColor, fontFamily: 'Roboto-Regular' }} tickFormatter={(value) => typeof value === 'number' ? value.toLocaleString() : value} />
-                        <Tooltip content={<CustomTooltip />} cursor={{fill: themeMode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'}}/>
-                        <Legend wrapperStyle={{ fontSize: `${scaleFont(12)}px`, color: legendTextColor, paddingTop: scale(8), fontFamily: 'Roboto-Regular' }} />
-                        {seriesInfoForRecharts.map(s => (
-                            <Bar key={s.dataKey} dataKey={s.dataKey} name={s.name} fill={s.fill} barSize={scale(22)} radius={[scale(4), scale(4), 0, 0]} />
-                        ))}
-                    </BarChart>
-                </ResponsiveContainer>
-            </View>
-        );
-    } else { // Native WebView fallback for Recharts
-        const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
-            <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
-            <script src="https://unpkg.com/recharts@2.10.0/umd/Recharts.min.js"></script>
-            <style>
-                body, html { margin: 0; padding: 0; background-color: transparent; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
-                #chart-container { width: 100%; height: 100%; }
-            </style>
-        </head>
-        <body>
-            <div id="chart-container"></div>
-            <script type="text/javascript">
-                const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = Recharts;
-                const data = ${JSON.stringify(rechartsData)};
-                const seriesInfo = ${JSON.stringify(seriesInfoForRecharts)};
-
-                const CustomTooltip = ({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    return React.createElement('div', {
-                        style: {
-                            backgroundColor: '${tooltipBgColor}',
-                            padding: '${scale(10)}px',
-                            borderRadius: '${scale(8)}px',
-                            border: '1px solid ${tooltipBorderColor}',
-                            color: '${tooltipTextColor}',
-                            boxShadow: '0 2px 8px rgba(0,0,0,${currentThemeColors.shadowOpacity})',
-                            fontFamily: 'Roboto, sans-serif'
-                        }
-                      },
-                      React.createElement('p', { style: { margin: 0, marginBottom: '${scale(5)}px', fontWeight: 'bold', fontFamily: 'Roboto, sans-serif' } }, label),
-                      payload.map((pld, index) => React.createElement('p', { key: index, style: { margin: '${scale(3)}px 0', color: pld.fill || pld.stroke || '${tooltipTextColor}', fontFamily: 'Roboto, sans-serif' } },
-                        pld.name + ': ' + (typeof pld.value === 'number' ? pld.value.toLocaleString() : pld.value)
-                      ))
-                    );
-                  }
-                  return null;
-                };
-
-                const ChartComponent = () => {
-                    if (data.length === 0 || seriesInfo.length === 0) {
-                        return React.createElement('p', {style: {color: '${tickColor}', textAlign: 'center', padding: '20px'}}, 'Dados insuficientes ou mal formatados para exibir o gráfico.');
-                    }
-
-                    let chartElement = React.createElement(BarChart, {
-                            data: data,
-                            margin: { top: 10, right: 15, left: -15, bottom: 5 },
-                            barGap: ${scale(8)}
-                          },
-                            React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: "${gridStrokeColor}" }),
-                            React.createElement(XAxis, { dataKey: "name", stroke: "${tickColor}", tick: { fontSize: ${scaleFont(11)}, fill: "${tickColor}", fontFamily: "Roboto, sans-serif" }, interval: 0 }),
-                            React.createElement(YAxis, { stroke: "${tickColor}", tick: { fontSize: ${scaleFont(11)}, fill: "${tickColor}", fontFamily: "Roboto, sans-serif" }, tickFormatter: (value) => typeof value === 'number' ? value.toLocaleString() : value }),
-                            React.createElement(Tooltip, { content: CustomTooltip, cursor:{fill: '${themeMode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'}'} }),
-                            React.createElement(Legend, { wrapperStyle: { fontSize: "${scaleFont(12)}px", color: "${legendTextColor}", paddingTop: '${scale(8)}px', fontFamily: "Roboto, sans-serif" } }),
-                            seriesInfo.map(s => React.createElement(Bar, { key: s.dataKey, dataKey: s.dataKey, name: s.name, fill: s.fill, barSize: ${scale(22)}, radius: [${scale(4)}, ${scale(4)}, 0, 0] }))
-                        );
-
-                    return React.createElement(ResponsiveContainer, { width: "100%", height: "100%" }, chartElement);
-                };
-
-                try {
-                    ReactDOM.render(React.createElement(ChartComponent), document.getElementById('chart-container'));
-                } catch (e) {
-                    console.error("Error rendering Recharts in WebView: ", e);
-                    document.getElementById('chart-container').innerHTML = '<p style="color: red; text-align: center; padding: 20px;">Erro ao renderizar gráfico: ' + e.message + '</p>';
-                }
-            </script>
-        </body>
-        </html>
-        `;
-        return (
-            <WebView
-                originWhitelist={['*']}
-                source={{ html: htmlContent }}
-                style={{ height: chartHeight, backgroundColor: 'transparent', width: '100%' }}
-                javaScriptEnabled={true}
-                domStorageEnabled={true}
-                showsVerticalScrollIndicator={false}
-                showsHorizontalScrollIndicator={false}
-                scrollEnabled={false}
-                androidHardwareAccelerationDisabled={Platform.OS === 'android'}
-                onError={(syntheticEvent) => {
-                    const { nativeEvent } = syntheticEvent;
-                    console.warn('WebView error (Native Chart): ', nativeEvent);
-                }}
+            <Chart
+                width={chartConfig.width || '100%'}
+                height={chartHeight}
+                chartType={chartConfig.chartType}
+                loader={<View style={{flex:1, justifyContent:'center', alignItems:'center', height: chartHeight}}><ActivityIndicator size="large" color={currentThemeColors.accentPrimary} /><Text style={{color: currentThemeColors.textSecondary, marginTop: 10, fontFamily: 'JetBrainsMono-Regular'}}>Carregando Gráfico...</Text></View>}
+                data={chartConfig.data}
+                options={adaptedOptions}
+                chartWrapperParams={{ view: { columns: chartConfig.viewColumns } }} // For DataView in some chart types
             />
+        );
+    } else {
+        // Fallback for native platforms
+        return (
+            <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: hexToRgba(currentThemeColors.warning, 0.1), borderWidth: 1, borderColor: currentThemeColors.warning, minHeight: scale(150), borderRadius: scale(8), marginVertical: scale(10) }}>
+                <MaterialIcons name="bar-chart" size={scale(30)} color={currentThemeColors.warning} />
+                <Text style={{ color: currentThemeColors.textSecondary, textAlign: 'center', marginTop: 10, fontFamily: 'JetBrainsMono-Regular' }}>
+                    Visualização de gráficos com Google Charts está disponível apenas na versão web.
+                </Text>
+            </View>
         );
     }
 };
@@ -341,7 +318,7 @@ export default function WalkerTECHFinancerAI() {
     const [currentFile, setCurrentFile] = useState(null);
 
     const [themeMode, setThemeMode] = useState('light');
-    const colors = themes[themeMode]; // This needs to be AFTER themeMode state
+    const colors = themes[themeMode];
 
     const [userProfile, setUserProfile] = useState({ name: 'Investidor', email: 'investidor.pro@email.com', plan: 'pro' });
     const [analysisPreferences, setAnalysisPreferences] = useState({ risk: 'moderate', horizon: 'medium' });
@@ -373,7 +350,7 @@ export default function WalkerTECHFinancerAI() {
         if (Platform.OS !== 'web') {
             subscription = AppState.addEventListener('change', handleAppStateChange);
         }
-        
+
         sidebarIconsRef.current.forEach((ref, index) => {
             if (ref) {
                 ref.transitionTo({ opacity: 1, translateY: 0 }, 500 + index * 100);
@@ -383,13 +360,13 @@ export default function WalkerTECHFinancerAI() {
         pickRandomSuggestions();
         const suggestionIntervalId = setInterval(() => {
             pickRandomSuggestions();
-        }, 5 * 60 * 1000); 
+        }, 5 * 60 * 1000);
 
         return () => {
             if (Platform.OS !== 'web' && subscription) {
                 subscription.remove();
             }
-            clearInterval(suggestionIntervalId); 
+            clearInterval(suggestionIntervalId);
         };
     }, []);
 
@@ -405,34 +382,30 @@ export default function WalkerTECHFinancerAI() {
 
     const showErrorToUser = (message) => {
         console.error("USER_ERROR_DISPLAY:", message);
-        if (Platform.OS !== 'web') { 
+        if (Platform.OS !== 'web') {
             alert(message);
         } else {
-            // For web, you might use a toast notification library or a custom modal
-            console.warn("Alert suppressed on web:", message);
-            // Example: You could set a state here to show a custom notification component
+            console.warn("User Info/Error (Web):", message);
         }
     };
 
     const initializeApp = async () => {
         setIsLoading(true);
         try {
-            const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+            const geminiApiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
-            if (!apiKey || apiKey === 'YOUR_API_KEY_HERE' || apiKey.length < 10) {
+            if (!geminiApiKey || geminiApiKey === 'YOUR_API_KEY_HERE' || geminiApiKey.length < 10 || geminiApiKey === "SUA_CHAVE_GEMINI_API_AQUI") {
                  console.warn(
                     "***********************************************************************************\n" +
                     "ATENÇÃO: Chave da API Gemini (EXPO_PUBLIC_GEMINI_API_KEY) não configurada \n" +
                     "corretamente no arquivo .env ou é um valor placeholder.\n" +
-                    "Verifique se o arquivo .env existe na raiz do projeto e contém a chave válida.\n" +
-                    "Exemplo: EXPO_PUBLIC_GEMINI_API_KEY=\"SUA_CHAVE_REAL\"\n" +
-                    "Após modificar o .env, REINICIE O METRO BUNDLER (npx expo start).\n" +
                     "A funcionalidade de IA pode não operar corretamente.\n" +
+                    "Verifique se o arquivo .env existe na raiz do projeto e contém a chave.\n" +
                     "***********************************************************************************"
                  );
             }
-            
-            genAI = new GoogleGenerativeAI(apiKey || 'FALLBACK_INVALID_KEY');
+
+            genAI = new GoogleGenerativeAI(geminiApiKey || 'FALLBACK_INVALID_KEY_INITIALIZATION_ERROR');
 
             try {
                 await loadAppSettings();
@@ -449,18 +422,18 @@ export default function WalkerTECHFinancerAI() {
             }
 
         } catch (error) {
-            console.error("CRITICAL: Error initializing GoogleGenerativeAI. This could be due to an invalid API key or network issues.", error);
-            showErrorToUser(`Falha crítica ao inicializar o serviço de IA. Verifique a chave de API (EXPO_PUBLIC_GEMINI_API_KEY no .env) e a conexão. Detalhes: ${error.message}`);
+            console.error("CRITICAL: Error initializing GoogleGenerativeAI.", error);
+            showErrorToUser(`Falha crítica ao inicializar o serviço de IA. Verifique a chave de API (.env) e a conexão. Detalhes: ${error.message}`);
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleAppStateChange = (nextAppState) => {
-        if (Platform.OS !== 'web') { 
+        if (Platform.OS !== 'web') {
             if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
                 console.log('App has come to the foreground!');
-                pickRandomSuggestions(); 
+                pickRandomSuggestions();
             } else if (nextAppState.match(/inactive|background/)) {
                 console.log('App has gone to the background, saving chat...');
                 if (currentView === 'chat' && messages.length > 0) {
@@ -514,25 +487,27 @@ export default function WalkerTECHFinancerAI() {
             const modelNameFromKey = GEMINI_MODEL_MAPPING[selectedAiModelKey] || GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
             let effectiveModelName = modelNameFromKey;
 
-            // Check if model exists in AI_MODELS_DISPLAY to ensure it's a valid known model ID
             if (!AI_MODELS_DISPLAY[effectiveModelName]) {
                 console.warn(`Model ID ${effectiveModelName} from mapping key ${selectedAiModelKey} is not in AI_MODELS_DISPLAY. Falling back to default.`);
                 effectiveModelName = GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
-                 if (!AI_MODELS_DISPLAY[effectiveModelName]) { // Final fallback if default is also not in display
-                    effectiveModelName = "gemini-1.5-flash"; // Hardcoded fallback
+                 if (!AI_MODELS_DISPLAY[effectiveModelName]) {
+                    effectiveModelName = "gemini-1.5-flash";
                     console.warn(`Default model ${GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY]} also not in AI_MODELS_DISPLAY. Using ${effectiveModelName}.`);
                  }
             }
 
-
-            if (currentFile && (effectiveModelName !== GEMINI_MODEL_MAPPING["WalkerTECH_Pro_Max"])) {
-                const fileCompatibleModelKey = "WalkerTECH_Pro_Max";
-                const fileCompatibleModel = GEMINI_MODEL_MAPPING[fileCompatibleModelKey] || "gemini-1.5-pro-latest"; // Ensure a fallback
-                console.warn(`Arquivo anexado, trocando modelo de ${effectiveModelName} para ${fileCompatibleModel} para melhor suporte a arquivos.`);
-                effectiveModelName = fileCompatibleModel;
+            if (currentFile || enableDeepResearch) {
+                const advancedModelKey = "WalkerTECH_Pro_Max";
+                const advancedModelId = GEMINI_MODEL_MAPPING[advancedModelKey];
+                if (effectiveModelName !== advancedModelId && AI_MODELS_DISPLAY[advancedModelId]) {
+                     console.warn(`Arquivo anexado ou pesquisa aprofundada habilitada. Trocando modelo de ${effectiveModelName} para ${advancedModelId} para melhor suporte. Este modelo pode incorrer em custos.`);
+                     effectiveModelName = advancedModelId;
+                } else if (effectiveModelName !== advancedModelId && !AI_MODELS_DISPLAY[advancedModelId]) {
+                    console.warn(`Modelo avançado ${advancedModelId} não encontrado em AI_MODELS_DISPLAY. Mantendo ${effectiveModelName}.`);
+                }
             }
-            
-            const generativeModel = genAI.getGenerativeModel({
+
+            const modelConfig = {
                 model: effectiveModelName,
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -541,128 +516,192 @@ export default function WalkerTECHFinancerAI() {
                     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
                 ],
                 generationConfig: { temperature: 0.7 }
-            });
+            };
 
-            let currentChat = chatSession;
-            if (!currentChat) {
+            if (enableDeepResearch) {
+                modelConfig.tools = tools;
+                modelConfig.toolConfig = { functionCallingConfig: { mode: FunctionCallingMode.AUTO } };
+            }
+
+            const generativeModel = genAI.getGenerativeModel(modelConfig);
+
+            let currentChatInstance = chatSession;
+            if (!currentChatInstance) {
                 const sdkChatHistory = messages
-                    .filter(msg => msg.id !== aiMessageId && !msg.isError && (msg.sender === 'user' || msg.sender === 'ai') && !msg.fileInfo)
+                    .filter(msg => msg.id !== aiMessageId && !msg.isError && (msg.sender === 'user' || msg.sender === 'ai') && !msg.fileInfo && !msg.isStreaming)
                     .map(msg => ({
                         role: msg.sender === 'user' ? 'user' : 'model',
                         parts: [{ text: msg.text }],
                     }));
 
-                let systemInstructionText = `Você é ${APP_NAME_DISPLAY}, um assistente financeiro especializado em finanças e investimentos no Brasil. Responda em Português Brasileiro. Seja cordial e use emojis de forma sutil e apropriada para tornar a conversa mais amigável.`;
+                let systemInstructionText = `Você é ${APP_NAME_DISPLAY}, um assistente financeiro especializado em finanças e investimentos no Brasil. Responda em Português Brasileiro. Seja cordial e use emojis de forma sutil e apropriada para tornar a conversa mais amigável. Utilize a família de fontes 'JetBrains Mono' para formatação de código e dados tabulares quando apropriado. Quando precisar apresentar dados tabulares, formate-os como tabelas Markdown com cabeçalhos e linhas claramente definidos.`;
                 if (selectedBank && selectedBank.id !== 'none') systemInstructionText += ` Contexto bancário atual: ${selectedBank.name}.`;
                 if (userProfile) systemInstructionText += ` Perfil do usuário: Nome: ${userProfile.name}, Plano: ${userProfile.plan}.`;
                 if (analysisPreferences) systemInstructionText += ` Preferências de Análise: Risco: ${analysisPreferences.risk}, Horizonte de Investimento: ${analysisPreferences.horizon}.`;
-                if (enableDeepResearch) systemInstructionText += ` O usuário habilitou pesquisa aprofundada na web; se necessário, indique que você buscaria informações atualizadas.`;
-                
-                // Using dynamic theme colors in the prompt
+
                 const currentThemeColorsForPrompt = themes[themeMode];
-                systemInstructionText += ` Se solicitado um gráfico, forneça uma estrutura JSON como esta: {"text": "Sua explicação textual sobre o gráfico...", "apex_chart_config": { "options": { "chart": { "foreColor": "${currentThemeColorsForPrompt.textSecondary}", "background": "transparent", "toolbar": {"show": false } }, "xaxis": { "categories": ["Ponto A", "Ponto B", "Ponto C"], "labels": { "style": { "colors": ["${currentThemeColorsForPrompt.textSecondary}", "${currentThemeColorsForPrompt.textSecondary}", "${currentThemeColorsForPrompt.textSecondary}"], "fontSize": "12px", "fontFamily": "Roboto, Arial, sans-serif" } }, "axisBorder": { "show": true, "color": "${currentThemeColorsForPrompt.borderColor}" }, "axisTicks": { "show": true, "color": "${currentThemeColorsForPrompt.borderColor}" } }, "yaxis": { "labels": { "style": { "colors": ["${currentThemeColorsForPrompt.textSecondary}"], "fontSize": "12px" } } }, "grid": { "borderColor": "${currentThemeColorsForPrompt.dividerColor}", "row": { "colors": ["transparent", "${themeMode === 'dark' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'}"], "opacity": 0.5 }, "column": { "colors": ["transparent"], "opacity": 0.5 } }, "tooltip": { "theme": "${themeMode}", "style": { "fontSize": "12px", "fontFamily": "Roboto, Arial, sans-serif" } }, "legend": { "show": true, "position": "top", "horizontalAlign": "center", "fontSize": "13px", "fontFamily": "Roboto, Arial, sans-serif", "fontWeight": 400, "labels": { "colors": "${currentThemeColorsForPrompt.textPrimary}" }, "markers": { "width": 10, "height": 10, "strokeWidth": 0, "radius": 12 } }, "colors": ["${currentThemeColorsForPrompt.accentPrimary}", "${currentThemeColorsForPrompt.accentSecondary}", "${currentThemeColorsForPrompt.success}", "${currentThemeColorsForPrompt.warning}", "${currentThemeColorsForPrompt.magenta}"], "plotOptions": { "bar": { "horizontal": false, "columnWidth": "60%", "borderRadius": 4, "dataLabels": { "position": "top" } } }, "dataLabels": { "enabled": false, "style": { "fontSize": "12px", "colors": ["${currentThemeColorsForPrompt.textPrimary}"] } }, "stroke": { "show": true, "width": 2, "colors": ["transparent"] } }, "series": [ { "name": "Exemplo Série", "data": [100, 120, 150] } ], "type": "bar", "height": 350 } }. Use cores do tema fornecidas para textos, eixos e grades. Para as cores das séries (array 'colors' na raiz de 'options'), use o conjunto de cores vibrantes fornecido. Se não houver gráfico, apenas forneça a resposta textual. Certifique-se que o JSON seja válido e o objeto 'options' esteja bem formado. O tipo 'type' deve ser preferencialmente 'bar'. A propriedade 'height' define a altura do gráfico em pixels.`;
-                
-                if (enableDeepResearch) systemInstructionText += ` Você pode usar a pesquisa na web para obter informações atualizadas.`;
-                
-                currentChat = generativeModel.startChat({
+                systemInstructionText += ` Se solicitado um gráfico, forneça uma estrutura JSON como esta: {"text": "Sua explicação textual sobre o gráfico...", "google_chart_config": { "chartType": "BarChart", "data": [["Cabeçalho1", "Cabeçalho2"], ["DadoA1", 10], ["DadoB1", 20]], "options": { "title": "Título do Gráfico", "backgroundColor": "transparent", "fontName": "JetBrainsMono-Regular", "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Bold"}, "legend": {"textStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}}, "hAxis": {"textStyle": {"color": "${currentThemeColorsForPrompt.textSecondary}", "fontName": "JetBrainsMono-Regular"}, "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}, "gridlines": {"color": "${currentThemeColorsForPrompt.dividerColor}"}}, "vAxis": {"textStyle": {"color": "${currentThemeColorsForPrompt.textSecondary}", "fontName": "JetBrainsMono-Regular"}, "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}, "gridlines": {"color": "${currentThemeColorsForPrompt.dividerColor}"}}, "colors": ["${currentThemeColorsForPrompt.accentPrimary}", "${currentThemeColorsForPrompt.accentSecondary}", "${currentThemeColorsForPrompt.success}", "${currentThemeColorsForPrompt.warning}", "${currentThemeColorsForPrompt.magenta}"], "chartArea": {"backgroundColor": "transparent"} }, "width": "100%", "height": "350px" } }. Use cores do tema fornecidas para textos, eixos e grades (como 'gridlines.color'). Para as cores das séries (array 'colors' nas 'options'), use o conjunto de cores vibrantes fornecido. Se não houver gráfico, apenas forneça a resposta textual. Certifique-se que o JSON seja válido. O tipo 'chartType' pode ser 'BarChart', 'LineChart', 'PieChart', 'ColumnChart', etc. A propriedade 'height' define a altura do gráfico em pixels (ex: '350px' ou 350). 'fontName' deve ser 'JetBrainsMono-Regular' ou 'JetBrainsMono-Bold' onde aplicável.`;
+
+                if (enableDeepResearch) {
+                    systemInstructionText += ` O usuário habilitou pesquisa aprofundada ('enableDeepResearch' é true). Você tem uma ferramenta chamada 'perform_web_search' para buscar informações atualizadas na web. Para usá-la, você fará uma chamada de função (function call) com o nome 'perform_web_search' e um argumento 'query' contendo o termo de busca. Após a busca, você receberá os resultados para formular sua resposta. Use esta ferramenta quando precisar de dados recentes, informações específicas fora do seu conhecimento base, ou para verificar fatos. Não invente URLs ou resultados de busca.`;
+                }
+
+                currentChatInstance = generativeModel.startChat({
                     history: sdkChatHistory,
-                    systemInstruction: { parts: [{ text: systemInstructionText }], role: "system" }
+                    systemInstruction: { parts: [{ text: systemInstructionText }], role: "system" },
+                    tools: enableDeepResearch ? tools : undefined,
+                    toolConfig: enableDeepResearch ? { functionCallingConfig: { mode: FunctionCallingMode.AUTO } } : undefined,
                 });
-                setChatSession(currentChat);
+                setChatSession(currentChatInstance);
             }
 
-            const promptParts = [];
+            let currentRequestParts = [];
             if (currentFile) {
                 if (Platform.OS === 'web' && currentFile.uri.startsWith('blob:')) {
                     console.warn("Handling blob URI on web for file upload. Ensure this is supported by your FileSystem setup or browser capabilities.");
-                    // For web blob URIs, you might need to fetch the blob and convert it if FileSystem.readAsStringAsync doesn't support it directly.
-                    // This example assumes FileSystem.readAsStringAsync can handle it or you have a polyfill.
                 }
                 const fileBase64 = await FileSystem.readAsStringAsync(currentFile.uri, { encoding: FileSystem.EncodingType.Base64 });
-                promptParts.push({ inlineData: { mimeType: currentFile.mimeType, data: fileBase64 } });
+                currentRequestParts.push({ inlineData: { mimeType: currentFile.mimeType, data: fileBase64 } });
 
                 if (!currentMessageText) {
-                     promptParts.push({ text: `Analise este arquivo: ${currentFile.name}` });
+                     currentRequestParts.push({ text: `Analise este arquivo: ${currentFile.name}` });
                 } else {
-                    promptParts.push({ text: currentMessageText });
+                    currentRequestParts.push({ text: currentMessageText });
                 }
             } else {
-                 promptParts.push({ text: currentMessageText || "Olá 👋" });
+                 currentRequestParts.push({ text: currentMessageText || "Olá 👋" });
             }
 
-            const result = await currentChat.sendMessageStream(promptParts);
-            let accumulatedText = "";
-            for await (const chunk of result.stream) {
-                const chunkText = chunk.text();
-                accumulatedText += chunkText;
-                updateAiMessageStream(aiMessageId, chunkText);
-            }
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+                const result = await currentChatInstance.sendMessageStream(currentRequestParts);
+                let aggregatedResponseText = "";
+                let functionCallEncountered = null;
 
-            let finalReplyText = accumulatedText;
-            let extractedApexChartConfig = null;
-            try {
-                const jsonRegex = /```json\s*([\s\S]*?)\s*```|({[\s\S]*})/; 
-                const match = accumulatedText.match(jsonRegex);
-                if (match) {
-                    const jsonString = match[1] || match[2]; 
-                    const parsedJson = JSON.parse(jsonString.trim());
-                    if (parsedJson && parsedJson.apex_chart_config && parsedJson.apex_chart_config.options && parsedJson.apex_chart_config.series && parsedJson.apex_chart_config.type) {
-                        extractedApexChartConfig = parsedJson.apex_chart_config;
-                        finalReplyText = typeof parsedJson.text === 'string' ? parsedJson.text : "Aqui está o gráfico solicitado: 📊";
-                        
-                        if (extractedApexChartConfig.height && typeof extractedApexChartConfig.height !== 'number') {
-                            extractedApexChartConfig.height = parseInt(extractedApexChartConfig.height, 10) || scale(320);
-                        } else if (!extractedApexChartConfig.height) {
-                            extractedApexChartConfig.height = scale(320);
+                for await (const chunk of result.stream) {
+                    const chunkText = chunk.text();
+                    if (chunkText) {
+                        aggregatedResponseText += chunkText;
+                        updateAiMessageStream(aiMessageId, chunkText);
+                    }
+                    if (chunk.candidates?.[0]?.content?.parts) {
+                        for (const part of chunk.candidates[0].content.parts) {
+                            if (part.functionCall) {
+                                functionCallEncountered = part.functionCall;
+                                break;
+                            }
                         }
-                         // Ensure chart options use theme colors if not specified by AI
-                        const currentThemeColorsForChart = themes[themeMode]; // Use a local var for clarity
-                        if (extractedApexChartConfig.options.chart) {
-                            extractedApexChartConfig.options.chart.foreColor = extractedApexChartConfig.options.chart.foreColor || currentThemeColorsForChart.textSecondary;
-                        }
-                        if (extractedApexChartConfig.options.xaxis && extractedApexChartConfig.options.xaxis.labels && extractedApexChartConfig.options.xaxis.labels.style) {
-                            extractedApexChartConfig.options.xaxis.labels.style.colors = extractedApexChartConfig.options.xaxis.labels.style.colors || [currentThemeColorsForChart.textSecondary];
-                        }
-                         if (extractedApexChartConfig.options.yaxis && extractedApexChartConfig.options.yaxis.labels && extractedApexChartConfig.options.yaxis.labels.style) {
-                            extractedApexChartConfig.options.yaxis.labels.style.colors = extractedApexChartConfig.options.yaxis.labels.style.colors || [currentThemeColorsForChart.textSecondary];
-                        }
-                        if (extractedApexChartConfig.options.grid) {
-                            extractedApexChartConfig.options.grid.borderColor = extractedApexChartConfig.options.grid.borderColor || currentThemeColorsForChart.dividerColor;
-                        }
-                        if (extractedApexChartConfig.options.legend && extractedApexChartConfig.options.legend.labels) {
-                             extractedApexChartConfig.options.legend.labels.colors = extractedApexChartConfig.options.legend.labels.colors || currentThemeColorsForChart.textPrimary;
-                        }
-                        extractedApexChartConfig.options.tooltip = extractedApexChartConfig.options.tooltip || {};
-                        extractedApexChartConfig.options.tooltip.theme = themeMode; // Ensure tooltip theme matches app theme
+                    }
+                    if (functionCallEncountered) break;
+                }
 
-
+                if (!functionCallEncountered) {
+                    const aggregatedResponse = await result.response;
+                    const candidate = aggregatedResponse.candidates?.[0];
+                    if (candidate?.content?.parts) {
+                        for (const part of candidate.content.parts) {
+                            if (part.functionCall) {
+                                functionCallEncountered = part.functionCall;
+                                break;
+                            }
+                        }
                     }
                 }
-            } catch (e) { 
-                console.warn("AI response was not valid JSON or did not contain apex_chart_config, using raw text:", e);
-            }
 
-            finalizeAiMessage(aiMessageId, finalReplyText, false, extractedApexChartConfig); 
-            if (currentFile) setCurrentFile(null);
+                if (functionCallEncountered && enableDeepResearch) {
+                    const fc = functionCallEncountered;
+                    if (fc.name === 'perform_web_search') {
+                        const searchQuery = fc.args.query;
+                        updateAiMessageStream(aiMessageId, `\n\n🔎 Buscando na web por: "${searchQuery}"...\n(Simulação - em um app real, isso seria uma busca externa)\n`);
+
+                        await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+                        const mockSearchResults = {
+                            summary: `Resultados simulados para '${searchQuery}': A Taxa Selic está em X% (dado simulado). O IPCA acumulado é Y% (dado simulado). O mercado de ações mostra volatilidade (dado simulado).`,
+                            details: `Esta é uma simulação. Em um aplicativo real, aqui estariam os resultados de uma busca na web por "${searchQuery}".`,
+                        };
+
+                        currentRequestParts = [{
+                            functionResponse: {
+                                name: 'perform_web_search',
+                                response: {
+                                    name: 'perform_web_search',
+                                    content: mockSearchResults,
+                                },
+                            }
+                        }];
+                    } else {
+                        console.warn("AI requested an unknown or unsupported function:", fc.name);
+                        updateAiMessageStream(aiMessageId, `\n⚠️ A IA tentou usar uma ferramenta desconhecida ('${fc.name}'). Continuando sem ela.`);
+                         currentRequestParts = [{
+                            functionResponse: {
+                                name: fc.name,
+                                response: { name: fc.name, content: { error: "Ferramenta não implementada pelo cliente." } },
+                            }
+                        }];
+                    }
+                } else {
+                    let finalReplyText = messages.find(m => m.id === aiMessageId)?.text || aggregatedResponseText;
+                    let extractedGoogleChartConfig = null;
+                    try {
+                        const jsonRegex = /```json\s*([\s\S]*?)\s*```|({[\s\S]*})/;
+                        const match = finalReplyText.match(jsonRegex);
+                        if (match) {
+                            const jsonString = match[1] || match[2];
+                            const parsedJson = JSON.parse(jsonString.trim());
+                            if (parsedJson && parsedJson.google_chart_config && parsedJson.google_chart_config.chartType && parsedJson.google_chart_config.data) {
+                                extractedGoogleChartConfig = parsedJson.google_chart_config;
+                                const textFromJSON = typeof parsedJson.text === 'string' ? parsedJson.text : null;
+
+                                if (textFromJSON) {
+                                    finalReplyText = textFromJSON;
+                                } else {
+                                    finalReplyText = finalReplyText.replace(jsonRegex, "\n📊 Gráfico abaixo:\n").trim();
+                                    if (finalReplyText.length < 10 && extractedGoogleChartConfig) {
+                                        finalReplyText = "Aqui está o gráfico solicitado: 📊";
+                                    }
+                                }
+
+                                if (extractedGoogleChartConfig.height && typeof extractedGoogleChartConfig.height === 'number') {
+                                     extractedGoogleChartConfig.height = `${extractedGoogleChartConfig.height}px`;
+                                } else if (extractedGoogleChartConfig.height && typeof extractedGoogleChartConfig.height !== 'string') {
+                                    extractedGoogleChartConfig.height = `${scale(320)}px`;
+                                } else if (!extractedGoogleChartConfig.height) {
+                                    extractedGoogleChartConfig.height = `${scale(320)}px`;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("AI response was not valid JSON or did not contain google_chart_config, using raw text:", e);
+                    }
+
+                    finalizeAiMessage(aiMessageId, finalReplyText, false, extractedGoogleChartConfig);
+                    if (currentFile) setCurrentFile(null);
+                    break;
+                }
+            }
 
         } catch (error) {
             console.error("Error sending message to Google AI:", error);
             let errorMessage = "😕 Falha ao comunicar com a IA. Tente novamente.";
             if (error.message) errorMessage = `Erro: ${error.message}`;
             if (error.toString().includes("API key not valid")) errorMessage = "🔑 Chave de API inválida. Verifique a chave configurada no .env (EXPO_PUBLIC_GEMINI_API_KEY).";
-            else if (error.toString().includes("billing account")) errorMessage = "💳 Problema com a conta de faturamento do Google Cloud.";
-            else if (error.toString().includes("quota")) errorMessage = "🚦 Cota de API excedida.";
-            else if (error.response && error.response.promptFeedback && error.response.promptFeedback.blockReason) {
+            else if (error.toString().includes("billing account")) errorMessage = "💳 Problema com a conta de faturamento do Google Cloud. Modelos Pro como 'gemini-2.5-pro-preview' exigem faturamento habilitado.";
+            else if (error.toString().includes("quota") || error.toString().includes("doesn't have a free quota tier")) {
+                errorMessage = `🚦 Cota de API excedida ou modelo sem cota gratuita (ex: Gemini 2.5 Pro Preview). Verifique seu plano e uso no Google AI Studio/Cloud Console. Para usar modelos Pro, habilite o faturamento. Detalhes: ${error.message}`;
+            }
+            else if (error.response?.promptFeedback?.blockReason) {
                  errorMessage = `Conteúdo bloqueado pela IA. Razão: ${error.response.promptFeedback.blockReason}`;
-            } else if (error.response && error.response.candidates && error.response.candidates[0] && error.response.candidates[0].finishReason === "SAFETY") {
+            } else if (error.response?.candidates?.[0]?.finishReason === "SAFETY") {
                  errorMessage = "Conteúdo bloqueado pela IA devido a políticas de segurança. 🛡️";
+            } else if (error.response?.candidates?.[0]?.finishReason === "OTHER" || error.response?.candidates?.[0]?.finishReason === "UNKNOWN" || error.response?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+                errorMessage = `Resposta da IA interrompida (${error.response.candidates[0].finishReason}). Tente refinar sua pergunta.`;
             }
             finalizeAiMessage(aiMessageId, errorMessage, true, null);
         } finally {
             setIsLoading(false);
         }
     };
-    
+
     const updateAiMessageStream = (id, chunk) => {
         setMessages(prevMessages =>
             prevMessages.map(msg =>
@@ -675,7 +714,7 @@ export default function WalkerTECHFinancerAI() {
         setMessages(prevMessages =>
             prevMessages.map(msg => {
                 if (msg.id === id) {
-                    return { ...msg, text: finalText ?? (msg.text || ""), isError, isStreaming: false, apex_chart_config: chartConfig };
+                    return { ...msg, text: finalText ?? (msg.text || ""), isError, isStreaming: false, google_chart_config: chartConfig };
                 }
                 return msg;
             })
@@ -703,8 +742,8 @@ export default function WalkerTECHFinancerAI() {
         setMessages([]);
         setMessageInput('');
         setCurrentFile(null);
-        pickRandomSuggestions(); 
-        await generateNewClientSessionId(); 
+        pickRandomSuggestions();
+        await generateNewClientSessionId();
         showView('chat');
     };
 
@@ -716,7 +755,7 @@ export default function WalkerTECHFinancerAI() {
         try {
             const result = await DocumentPicker.getDocumentAsync({
                 type: ['image/*', 'application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'],
-                copyToCacheDirectory: Platform.OS !== 'web', 
+                copyToCacheDirectory: Platform.OS !== 'web',
             });
             if (result.canceled === false && result.assets && result.assets.length > 0) {
                 const asset = result.assets[0];
@@ -724,11 +763,11 @@ export default function WalkerTECHFinancerAI() {
                     showErrorToUser(`Arquivo muito grande. Máximo: ${MAX_FILE_SIZE_MB}MB. 😥`);
                     return;
                 }
-                setCurrentFile({ 
-                    uri: asset.uri, 
-                    name: asset.name, 
-                    mimeType: asset.mimeType || (Platform.OS === 'web' && asset.file ? asset.file.type : 'application/octet-stream'), 
-                    ...(Platform.OS === 'web' && asset.file && { originalFile: asset.file }) 
+                setCurrentFile({
+                    uri: asset.uri,
+                    name: asset.name,
+                    mimeType: asset.mimeType || (Platform.OS === 'web' && asset.file ? asset.file.type : 'application/octet-stream'),
+                    ...(Platform.OS === 'web' && asset.file && { originalFile: asset.file })
                 });
             }
         } catch (err) {
@@ -738,10 +777,11 @@ export default function WalkerTECHFinancerAI() {
     };
     const removeFile = () => setCurrentFile(null);
 
+    // --- Storage Functions ---
     const loadAppSettings = async () => {
         try {
             const savedTheme = await AsyncStorage.getItem('appTheme');
-            if (savedTheme) setThemeMode(savedTheme); else setThemeMode('light'); // Default to light if nothing saved
+            if (savedTheme) setThemeMode(savedTheme); else setThemeMode('light');
 
             const savedModelKey = await AsyncStorage.getItem('selectedAiModelKey');
             if (savedModelKey && GEMINI_MODEL_MAPPING[savedModelKey]) setSelectedAiModelKey(savedModelKey);
@@ -762,11 +802,11 @@ export default function WalkerTECHFinancerAI() {
             await AsyncStorage.setItem('selectedAiModelKey', selectedAiModelKey);
             await AsyncStorage.setItem('enableDeepResearch', JSON.stringify(enableDeepResearch));
             await AsyncStorage.setItem('selectedBankId', selectedBank.id);
-            showErrorToUser("Configurações salvas! 👍"); 
+            showErrorToUser("Configurações salvas! 👍");
             if (closeModal) setAppNameDropdownVisible(false);
         } catch (e) { console.error("Failed to save app settings", e); showErrorToUser("Erro ao salvar configurações. 💾");}
     };
-    
+
     const loadUserProfile = async () => {
         try {
             const profileString = await AsyncStorage.getItem('userProfile');
@@ -806,19 +846,19 @@ export default function WalkerTECHFinancerAI() {
                 id: currentSessionId,
                 title: chatTitle,
                 date: new Date().toISOString(),
-                messages: messages.map(m => ({ ...m, isStreaming: false })), 
+                messages: messages.map(m => ({ ...m, isStreaming: false })),
                 selectedBankId: selectedBank.id,
                 selectedAiModelKey: selectedAiModelKey,
                 enableDeepResearch: enableDeepResearch,
             };
 
-            historyStore = historyStore.filter(item => item.id !== currentSessionId); 
-            historyStore.unshift(chatEntry); 
+            historyStore = historyStore.filter(item => item.id !== currentSessionId);
+            historyStore.unshift(chatEntry);
             if (historyStore.length > MAX_HISTORY_ITEMS) {
                 historyStore = historyStore.slice(0, MAX_HISTORY_ITEMS);
             }
             await AsyncStorage.setItem('chatHistory', JSON.stringify(historyStore));
-            setHistoryItems(historyStore); 
+            setHistoryItems(historyStore);
         }
     };
     const loadChatHistory = async () => {
@@ -828,7 +868,7 @@ export default function WalkerTECHFinancerAI() {
         } catch (e) { console.error("Failed to load chat history", e); setHistoryItems([]); }
     };
     const loadChatFromHistory = async (historyItem) => {
-        if (messages.length > 0 && currentSessionId !== historyItem.id) { 
+        if (messages.length > 0 && currentSessionId !== historyItem.id) {
             await saveCurrentChatToHistory();
         }
         setMessages(historyItem.messages || []);
@@ -837,7 +877,7 @@ export default function WalkerTECHFinancerAI() {
         setEnableDeepResearch(historyItem.enableDeepResearch || false);
         const bank = banksData.find(b => b.id === historyItem.selectedBankId);
         setSelectedBank(bank || banksData[0]);
-        setChatSession(null); 
+        setChatSession(null);
         showView('chat');
     };
     const deleteHistoryItem = async (historyId) => {
@@ -845,15 +885,15 @@ export default function WalkerTECHFinancerAI() {
         historyStore = historyStore.filter(item => item.id !== historyId);
         await AsyncStorage.setItem('chatHistory', JSON.stringify(historyStore));
         setHistoryItems(historyStore);
-        if (currentSessionId === historyId) { 
-            handleNewChat(false); 
+        if (currentSessionId === historyId) {
+            handleNewChat(false);
         }
     };
     const clearAllHistory = async () => {
         await AsyncStorage.removeItem('chatHistory');
         setHistoryItems([]);
-        if (currentView === 'history') { 
-             handleNewChat(true); 
+        if (currentView === 'history') {
+             handleNewChat(true);
         }
         showErrorToUser("Histórico de chats apagado. 🗑️");
     };
@@ -861,40 +901,53 @@ export default function WalkerTECHFinancerAI() {
     const renderMessageItem = ({ item, index }) => {
         const isUser = item.sender === 'user';
         const markdownStyles = {
-            // General Text & Links
-            body: { color: isUser ? colors.messageUserText : colors.messageAiText, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'Roboto-Regular' },
-            link: { color: colors.accentSecondary, textDecorationLine: 'underline', fontWeight: 'bold', fontFamily: 'Roboto-Bold' },
-            
-            // Headings
-            heading1: { color: isUser ? colors.messageUserText : colors.accentPrimary, fontWeight: 'bold', fontSize: scaleFont(26), marginTop:scale(18), marginBottom:scale(10), borderBottomWidth:2, borderColor: colors.dividerColor, paddingBottom: scale(8), fontFamily: 'Roboto-Bold'},
-            heading2: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: 'bold', fontSize: scaleFont(22), marginTop:scale(16), marginBottom:scale(8), borderBottomWidth:1, borderColor: colors.dividerColor, paddingBottom: scale(6), fontFamily: 'Roboto-Bold'},
-            heading3: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: '600', fontSize: scaleFont(19), marginTop:scale(14), marginBottom:scale(6), fontFamily: 'Roboto-Bold'},
-            heading4: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: '600', fontSize: scaleFont(17), marginTop:scale(12), marginBottom:scale(5), fontFamily: 'Roboto-Bold'},
-            heading5: { color: isUser ? colors.messageUserText : colors.textSecondary, fontWeight: '600', fontSize: scaleFont(16), marginTop:scale(10), marginBottom:scale(4), fontFamily: 'Roboto-Bold'},
-            heading6: { color: isUser ? colors.messageUserText : colors.textSecondary, fontWeight: '600', fontSize: scaleFont(15), marginTop:scale(8), marginBottom:scale(3), fontFamily: 'Roboto-Bold'},
-
-            // Code Blocks
+            body: { color: isUser ? colors.messageUserText : colors.messageAiText, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'JetBrainsMono-Regular' },
+            link: { color: colors.accentSecondary, textDecorationLine: 'underline', fontWeight: 'bold', fontFamily: 'JetBrainsMono-Bold' },
+            heading1: { color: isUser ? colors.messageUserText : colors.accentPrimary, fontWeight: 'bold', fontSize: scaleFont(26), marginTop:scale(18), marginBottom:scale(10), borderBottomWidth:2, borderColor: colors.dividerColor, paddingBottom: scale(8), fontFamily: 'JetBrainsMono-Bold'},
+            heading2: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: 'bold', fontSize: scaleFont(22), marginTop:scale(16), marginBottom:scale(8), borderBottomWidth:1, borderColor: colors.dividerColor, paddingBottom: scale(6), fontFamily: 'JetBrainsMono-Bold'},
+            heading3: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: '600', fontSize: scaleFont(19), marginTop:scale(14), marginBottom:scale(6), fontFamily: 'JetBrainsMono-Bold'},
+            heading4: { color: isUser ? colors.messageUserText : colors.textPrimary, fontWeight: '600', fontSize: scaleFont(17), marginTop:scale(12), marginBottom:scale(5), fontFamily: 'JetBrainsMono-Bold'},
+            heading5: { color: isUser ? colors.messageUserText : colors.textSecondary, fontWeight: '600', fontSize: scaleFont(16), marginTop:scale(10), marginBottom:scale(4), fontFamily: 'JetBrainsMono-Bold'},
+            heading6: { color: isUser ? colors.messageUserText : colors.textSecondary, fontWeight: '600', fontSize: scaleFont(15), marginTop:scale(8), marginBottom:scale(3), fontFamily: 'JetBrainsMono-Bold'},
             code_inline: { backgroundColor: isUser ? 'rgba(0,0,0,0.2)' : colors.bgElevation1, paddingHorizontal: scale(6), paddingVertical: scale(3), borderRadius: scale(6), fontFamily: 'JetBrainsMono-Regular', fontSize: scaleFont(14.5) },
             code_block: { backgroundColor: isUser ? 'rgba(0,0,0,0.2)' : colors.bgElevation1, padding: scale(14), borderRadius: scale(8), fontFamily: 'JetBrainsMono-Regular', marginVertical: scale(10), fontSize: scaleFont(14.5), borderWidth: 1, borderColor: colors.borderColor },
-            
-            // Tables
-            table: { borderColor: colors.borderColor, borderWidth: 1, borderRadius: scale(8), marginVertical: scale(14), overflow: 'hidden' },
-            thead: {}, 
-            th: { backgroundColor: colors.bgTertiary, padding: scale(10), borderBottomWidth:1, borderColor: colors.dividerColor, color: colors.textPrimary, fontWeight: 'bold', fontFamily: 'Roboto-Bold', textAlign: 'left' },
+
+            table: {
+                borderColor: colors.borderColor,
+                borderWidth: 1,
+                borderRadius: scale(8),
+                marginVertical: scale(14),
+                overflow: 'hidden',
+            },
+            thead: {},
+            th: {
+                flex: 1,
+                backgroundColor: colors.bgTertiary,
+                padding: scale(10),
+                color: colors.textPrimary,
+                fontWeight: 'bold',
+                fontFamily: 'JetBrainsMono-Bold',
+                textAlign: 'left',
+            },
             tbody: {},
-            tr: { borderBottomWidth:1, borderColor: colors.dividerColor },
-            td: { padding: scale(10), color: colors.textPrimary, fontFamily: 'Roboto-Regular', textAlign: 'left' },
-            
-            // Lists
+            tr: {
+                flexDirection: 'row',
+                borderBottomWidth: 1,
+                borderColor: colors.dividerColor,
+            },
+            td: {
+                flex: 1,
+                padding: scale(10),
+                color: colors.textPrimary,
+                fontFamily: 'JetBrainsMono-Regular',
+                textAlign: 'left',
+            },
+
             list_item: { marginVertical: scale(5), flexDirection: 'row', alignItems: 'flex-start'},
-            bullet_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: Platform.OS === 'ios' ? scaleFont(12) : scaleFont(18), lineHeight: scaleFont(25), fontWeight: 'bold' }, 
-            ordered_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'Roboto-Bold' }, 
-            
-            // Emphasis
-            strong: {fontFamily: 'Roboto-Bold', fontWeight: 'bold'}, 
-            em: {fontFamily: 'Roboto-Italic', fontStyle: 'italic'},
-            
-            // Blockquote
+            bullet_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: Platform.OS === 'ios' ? scaleFont(12) : scaleFont(18), lineHeight: scaleFont(25), fontWeight: 'bold' },
+            ordered_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'JetBrainsMono-Bold' },
+            strong: {fontFamily: 'JetBrainsMono-Bold', fontWeight: 'bold'},
+            em: {fontFamily: 'JetBrainsMono-Regular', fontStyle: 'italic'},
             blockquote: {
                 backgroundColor: colors.bgTertiary,
                 paddingHorizontal: scale(15),
@@ -904,29 +957,28 @@ export default function WalkerTECHFinancerAI() {
                 borderLeftColor: colors.accentPrimary,
                 borderRadius: scale(6),
             },
-            
             hr: { backgroundColor: colors.dividerColor, height: 1, marginVertical: scale(15) },
-            image: { marginVertical: scale(10), borderRadius: scale(8) }, 
+            image: { marginVertical: scale(10), borderRadius: scale(8) },
         };
 
         const messageContainerStyle = [
-            styles.messageBubbleBase,
+            styles.messageBubbleBase(colors),
             isUser ? styles.userMessageBubble(colors) : styles.aiMessageBubble(colors),
             item.isError ? styles.errorMessageBubble(colors) : {}
         ];
 
         let messageContent = item.text;
-        if (item.fileInfo && !item.text) { 
+        if (item.fileInfo && !item.text) {
             messageContent = `📎 Arquivo: ${item.fileInfo.name}`;
         } else if (item.fileInfo && item.text && item.text.startsWith(`Arquivo: ${item.fileInfo.name}`)) {
             // Text already includes file info
         }
 
         return (
-            <Animatable.View 
-                animation="fadeInUp" 
-                duration={400} 
-                delay={index < 5 ? index * 60 : 0} 
+            <Animatable.View
+                animation="fadeInUp"
+                duration={400}
+                delay={index < 5 ? index * 60 : 0}
                 useNativeDriver={Platform.OS !== 'web'}
                 style={messageContainerStyle}
             >
@@ -938,17 +990,16 @@ export default function WalkerTECHFinancerAI() {
                                 {messageContent + (item.isStreaming && !item.isError ? '▍' : '')}
                             </Markdown>
                         )}
-                        {item.isError && <Text style={{color: colors.danger, marginTop: scale(6), fontStyle: 'italic', fontSize: scaleFont(14), fontFamily: 'Roboto-Italic'}}>Erro ao processar.</Text>}
+                        {item.isError && <Text style={{color: colors.danger, marginTop: scale(6), fontStyle: 'italic', fontSize: scaleFont(14), fontFamily: 'JetBrainsMono-Regular'}}>Erro ao processar.</Text>}
                     </View>
                     {isUser && <MaterialIcons name="account-circle" size={scale(24)} color={colors.messageUserText} style={{ marginLeft: scale(10), marginTop: scale(3) }} />}
                 </View>
-                
-                {!isUser && item.apex_chart_config && item.apex_chart_config.options && item.apex_chart_config.series && (
-                     <View style={styles.rechartsContainer(colors)}>
-                         <RechartsDisplay
-                             apexChartConfig={item.apex_chart_config}
+
+                {!isUser && item.google_chart_config && item.google_chart_config.chartType && item.google_chart_config.data && (
+                     <View style={styles.chartContainer(colors)}>
+                         <GoogleChartDisplay
+                             chartConfig={item.google_chart_config}
                              themeMode={themeMode}
-                             height={item.apex_chart_config.height || scale(320)}
                          />
                      </View>
                  )}
@@ -963,7 +1014,7 @@ export default function WalkerTECHFinancerAI() {
                 onPress={() => handleSuggestionSelect(item.text)}
                 activeOpacity={0.75}
             >
-                <Text style={styles.suggestionCardText(colors)}>{item.text}</Text>
+                <Text style={styles.suggestionCardText(colors)} numberOfLines={4} ellipsizeMode="tail">{item.text}</Text>
                 <View style={styles.suggestionCardIconContainer(colors, colors[item.borderColorThemeKey] || item.borderColorThemeKey || colors.accentPrimary)}>
                     <MaterialIcons name={item.icon || "help-outline"} size={scale(20)} color={colors.bgWhite} />
                 </View>
@@ -974,14 +1025,14 @@ export default function WalkerTECHFinancerAI() {
     const renderChatView = () => (
         <>
             {messages.length === 0 && !isLoading && (
-                <ScrollView 
+                <ScrollView
                     contentContainerStyle={styles.initialGreetingScrollViewContainer(colors)}
                     showsVerticalScrollIndicator={false}
                 >
-                    <Animatable.View 
-                        animation="fadeInUp" 
-                        duration={700} 
-                        delay={250} 
+                    <Animatable.View
+                        animation="fadeInUp"
+                        duration={700}
+                        delay={250}
                         useNativeDriver={Platform.OS !== 'web'}
                         style={styles.initialGreetingContainer(colors)}
                     >
@@ -991,7 +1042,7 @@ export default function WalkerTECHFinancerAI() {
                         <Text style={styles.greetingSubText(colors)}>Como posso te ajudar a prosperar hoje? ✨</Text>
                         {displayedSuggestions.length > 0 ? (
                             <View style={styles.suggestionCardsGrid}>
-                                {displayedSuggestions.map((item, index) => ( 
+                                {displayedSuggestions.map((item, index) => (
                                     <View key={`suggestion-${index}`} style={styles.suggestionCardWrapper}>
                                        {renderSuggestionCard({ item, index })}
                                     </View>
@@ -1013,17 +1064,17 @@ export default function WalkerTECHFinancerAI() {
                     onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
                 />
             )}
-            {isLoading && messages.length === 0 && ( 
+            {isLoading && messages.length === 0 && (
                  <View style={{flex:1, justifyContent:'center', alignItems:'center', backgroundColor: colors.bgSecondary}}>
                     <ActivityIndicator size="large" color={colors.accentPrimary}/>
-                    <Text style={{color: colors.textSecondary, marginTop:scale(18), fontSize: scaleFont(17), fontFamily: 'Roboto-Medium'}}>
+                    <Text style={{color: colors.textSecondary, marginTop:scale(18), fontSize: scaleFont(17), fontFamily: 'JetBrainsMono-Medium'}}>
                         {genAI ? "Conectando à IA... 🚀" : "Inicializando app... 🛠️"}
                     </Text>
                 </View>
             )}
         </>
     );
-    
+
     const renderHistoryView = () => (
         <Animatable.View animation="fadeIn" duration={400} style={styles.panelContainer(colors)} useNativeDriver={Platform.OS !== 'web'}>
             <View style={styles.panelHeader(colors)}>
@@ -1058,7 +1109,7 @@ export default function WalkerTECHFinancerAI() {
                             </TouchableOpacity>
                         </Animatable.View>
                     )}
-                    contentContainerStyle={{ paddingBottom: scale(25) }}
+                    contentContainerStyle={{ paddingBottom: scale(25), paddingHorizontal: scale(22) }}
                 />
             )}
         </Animatable.View>
@@ -1085,6 +1136,9 @@ export default function WalkerTECHFinancerAI() {
                             {enableDeepResearch && <MaterialIcons name="check" size={scale(20)} color={colors.buttonText} />}
                         </TouchableOpacity>
                     </View>
+                     <Text style={styles.settingDescription(colors)}>
+                        Permite que a IA use ferramentas de busca na web para informações mais recentes. (Pode usar modelos mais avançados e incorrer em custos)
+                    </Text>
                 </Animatable.View>
 
                 <Animatable.View animation="fadeInUp" delay={200} duration={400} useNativeDriver={Platform.OS !== 'web'}>
@@ -1176,24 +1230,27 @@ export default function WalkerTECHFinancerAI() {
                 { icon: "add-circle-outline", size: scale(34), action: () => handleNewChat(), label: "Novo Chat" },
                 { isSpacer: true },
                 { icon: "history", size: scale(28), action: () => showView('history'), label: "Histórico" },
-                { icon: "settings", size: scale(26), action: () => showView('settings'), label: "Configurações" },
+                { icon: "settings", size: scale(26), action: () => showView('settings'), label: "Configurações IA" },
             ].map((item, index) => {
                 if (item.isSpacer) return <View key={`spacer-${index}`} style={{flex:1}} />;
                 return (
-                    <Animatable.View 
-                        key={item.icon + index} 
+                    <Animatable.View
+                        key={item.icon + index}
                         ref={ref => sidebarIconsRef.current[index] = ref}
-                        style={{opacity: 0, transform: [{translateY: 20}]}} 
+                        style={{opacity: 0, transform: [{translateY: 20}]}}
                         useNativeDriver={Platform.OS !== 'web'}
                     >
-                        <TouchableOpacity 
-                            style={styles.sidebarIconWrapper(colors)} 
+                        <TouchableOpacity
+                            style={styles.sidebarIconWrapper(colors)}
                             onPress={item.action}
                             accessible={true}
                             accessibilityLabel={item.label}
                             activeOpacity={0.6}
                         >
-                            <MaterialIcons name={item.icon} size={item.size} color={'#FFFFFF'} />
+                            {item.type === "material-community" ?
+                                <MaterialCommunityIcons name={item.icon} size={item.size} color={'#FFFFFF'} /> :
+                                <MaterialIcons name={item.icon} size={item.size} color={'#FFFFFF'} />
+                            }
                         </TouchableOpacity>
                     </Animatable.View>
                 );
@@ -1206,11 +1263,11 @@ export default function WalkerTECHFinancerAI() {
             <TouchableOpacity style={styles.appNameTouchable(colors)} onPress={() => setAppNameDropdownVisible(true)} activeOpacity={0.7}>
                 <View>
                     <Text style={styles.appNameText(colors)}>{APP_NAME_DISPLAY}</Text>
-                    <Animatable.View 
-                        animation="fadeInLeft" 
-                        duration={800} 
-                        delay={300} 
-                        style={styles.appNameUnderline(colors)} 
+                    <Animatable.View
+                        animation="fadeInLeft"
+                        duration={800}
+                        delay={300}
+                        style={styles.appNameUnderline(colors)}
                         useNativeDriver={Platform.OS !== 'web'}
                     />
                 </View>
@@ -1241,7 +1298,7 @@ export default function WalkerTECHFinancerAI() {
                         placeholderTextColor={colors.textPlaceholder}
                         multiline
                         editable={!isLoading}
-                        textAlignVertical="top" 
+                        textAlignVertical="top"
                     />
                     <TouchableOpacity
                         onPress={() => handleSendMessage()}
@@ -1269,11 +1326,11 @@ export default function WalkerTECHFinancerAI() {
             animationType="fade" transparent={true} visible={menuModalVisible}
             onRequestClose={() => setMenuModalVisible(false)}>
             <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setMenuModalVisible(false)}>
-                <Animatable.View 
-                    animation="slideInLeft" 
-                    duration={400} 
-                    style={[styles.menuModalBase(colors), styles.hamburgerMenuModalPos(colors)]} 
-                    onStartShouldSetResponder={() => true} 
+                <Animatable.View
+                    animation="slideInLeft"
+                    duration={400}
+                    style={[styles.menuModalBase(colors), styles.hamburgerMenuModalPos(colors)]}
+                    onStartShouldSetResponder={() => true}
                     useNativeDriver={Platform.OS !== 'web'}
                 >
                     <View style={styles.menuHeader(colors)}>
@@ -1298,9 +1355,9 @@ export default function WalkerTECHFinancerAI() {
                         setAnalysisPreferences({ risk: 'moderate', horizon: 'medium' });
                         setHistoryItems([]); setSelectedBank(banksData[0]);
                         setSelectedAiModelKey(DEFAULT_MODEL_KEY); setEnableDeepResearch(false);
-                        setThemeMode('light'); 
+                        setThemeMode('light');
                         setCurrentSessionId(null); setChatSession(null);
-                        pickRandomSuggestions(); 
+                        pickRandomSuggestions();
                         await generateNewClientSessionId();
                         showView('chat');
                     }} activeOpacity={0.7}>
@@ -1317,10 +1374,10 @@ export default function WalkerTECHFinancerAI() {
             animationType="fade" transparent={true} visible={appNameDropdownVisible}
             onRequestClose={() => setAppNameDropdownVisible(false)}>
             <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setAppNameDropdownVisible(false)}>
-                <Animatable.View 
-                    animation="fadeInDown" 
-                    duration={300} 
-                    style={[styles.menuModalBase(colors), styles.appNameDropdownModalPos(colors)]} 
+                <Animatable.View
+                    animation="fadeInDown"
+                    duration={300}
+                    style={[styles.menuModalBase(colors), styles.appNameDropdownModalPos(colors)]}
                     onStartShouldSetResponder={() => true}
                     useNativeDriver={Platform.OS !== 'web'}
                 >
@@ -1351,8 +1408,8 @@ export default function WalkerTECHFinancerAI() {
                             <Picker
                                 selectedValue={selectedAiModelKey}
                                 onValueChange={(itemValue) => setSelectedAiModelKey(itemValue)}
-                                style={styles.pickerStyle(colors)} 
-                                itemStyle={styles.pickerItemStyle(colors)} 
+                                style={styles.pickerStyle(colors)}
+                                itemStyle={styles.pickerItemStyle(colors)}
                                 dropdownIconColor={colors.textPrimary}
                                 mode="dropdown"
                             >
@@ -1361,7 +1418,7 @@ export default function WalkerTECHFinancerAI() {
                                         key={key}
                                         label={AI_MODELS_DISPLAY[modelId] || key}
                                         value={key}
-                                        color={(Platform.OS === 'android' || Platform.OS === 'web') ? colors.textPrimary : undefined} 
+                                        color={(Platform.OS === 'android' || Platform.OS === 'web') ? colors.textPrimary : undefined}
                                     />
                                 ))}
                             </Picker>
@@ -1381,10 +1438,10 @@ export default function WalkerTECHFinancerAI() {
             animationType="slide" transparent={true} visible={bankModalVisible}
             onRequestClose={() => setBankModalVisible(false)}>
             <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setBankModalVisible(false)}>
-                <Animatable.View 
-                    animation="fadeInUpBig" 
-                    duration={400} 
-                    style={[styles.menuModalBase(colors), styles.bankSelectionModalContent(colors)]} 
+                <Animatable.View
+                    animation="fadeInUpBig"
+                    duration={400}
+                    style={[styles.menuModalBase(colors), styles.bankSelectionModalContent(colors)]}
                     onStartShouldSetResponder={() => true}
                     useNativeDriver={Platform.OS !== 'web'}
                 >
@@ -1423,7 +1480,7 @@ export default function WalkerTECHFinancerAI() {
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : (Platform.OS === "web" ? undefined : "height")}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} 
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
         >
             <View style={styles.appContainer(colors)}>
                 <StatusBar barStyle={colors.statusBar} backgroundColor={colors.bgPrimary} />
@@ -1441,10 +1498,10 @@ export default function WalkerTECHFinancerAI() {
                             </Animatable.View>
                         </View>
                         {currentView === 'chat' && renderInputArea()}
-                        {currentView === 'chat' && Platform.OS !== 'web' && renderFooter()} 
+                        {currentView === 'chat' && Platform.OS !== 'web' && renderFooter()}
                     </View>
                 </View>
-                
+
                 {renderHamburgerMenuModal()}
                 {renderAppNameDropdownModal()}
                 {renderBankSelectionModal()}
@@ -1457,31 +1514,31 @@ const styles = StyleSheet.create({
     appContainer: (colors) => ({ flex: 1, backgroundColor: colors.bgPage }),
     mainRowContainer: () => ({ flex: 1, flexDirection: 'row' }),
     sidebar: (colors) => ({
-        width: SIDEBAR_WIDTH, 
+        width: SIDEBAR_WIDTH,
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + scale(25) : (Platform.OS === 'web' ? scale(25) : scale(60)),
         paddingBottom: scale(25),
         alignItems: 'center',
         ...(Platform.OS === 'web' && { height: '100vh', position: 'fixed', left: 0, top: 0, zIndex: 100 }),
     }),
     sidebarIconWrapper: (colors) => ({
-        paddingVertical: scale(20), 
+        paddingVertical: scale(20),
         width: '100%',
         alignItems: 'center',
     }),
-    mainContentColumn: (colors) => ({ 
-        flex: 1, 
+    mainContentColumn: (colors) => ({
+        flex: 1,
         backgroundColor: colors.bgSecondary,
-        ...(Platform.OS === 'web' && { marginLeft: SIDEBAR_WIDTH, height: '100vh', display: 'flex', flexDirection: 'column' }), // Added display flex for web
+        ...(Platform.OS === 'web' && { marginLeft: SIDEBAR_WIDTH, height: '100vh', display: 'flex', flexDirection: 'column' }),
     }),
     topBar: (colors) => ({
         flexDirection: 'row',
-        justifyContent: 'flex-start', 
+        justifyContent: 'flex-start',
         alignItems: 'center',
-        paddingHorizontal: scale(22), 
+        paddingHorizontal: scale(22),
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + scale(18) : (Platform.OS === 'web' ? scale(18) : scale(55)),
         paddingBottom: scale(18),
         backgroundColor: colors.bgPrimary,
-        minHeight: scale(75), 
+        minHeight: scale(75),
         borderBottomWidth: 1,
         borderBottomColor: colors.dividerColor,
         ...(Platform.OS === 'web' && { position: 'sticky', top: 0, zIndex: 90, width: '100%' }),
@@ -1492,173 +1549,186 @@ const styles = StyleSheet.create({
         paddingVertical: scale(5),
     }),
     appNameText: (colors) => ({
-        fontSize: scaleFont(20), 
-        fontWeight: 'bold', 
+        fontSize: scaleFont(20),
+        fontWeight: 'bold',
         color: colors.textPrimary,
-        fontFamily: 'JetBrainsMono-Bold', 
+        fontFamily: 'JetBrainsMono-Bold',
     }),
     appNameUnderline: (colors) => ({
         height: scale(3),
-        backgroundColor: colors.appNameUnderline, 
+        backgroundColor: colors.appNameUnderline,
         marginTop: scale(3),
         borderRadius: scale(3),
-        width: '70%', 
+        width: '70%',
     }),
-    chatOrViewArea: (colors) => ({ 
-        flex: 1, 
+    chatOrViewArea: (colors) => ({
+        flex: 1,
         backgroundColor: colors.bgSecondary,
-        ...(Platform.OS === 'web' && { display: 'flex', flexDirection: 'column', overflowY: 'hidden' }) // Prevent double scrollbars on web
+        ...(Platform.OS === 'web' && { display: 'flex', flexDirection: 'column', overflowY: 'hidden' })
     }),
 
-    messagesContainer: (colors) => ({ 
-        flex: 1, 
+    messagesContainer: (colors) => ({
+        flex: 1,
         backgroundColor: colors.bgSecondary,
         ...(Platform.OS === 'web' && { overflowY: 'auto', flexGrow: 1 })
     }),
-    messageBubbleBase: {
-        maxWidth: '88%', 
-        paddingVertical: scale(14), 
+    messageBubbleBase: (colors) => ({
+        maxWidth: '88%',
+        paddingVertical: scale(14),
         paddingHorizontal: scale(18),
-        borderRadius: scale(22), 
-        marginVertical: scale(7), 
-        shadowOffset: { width: 0, height: scale(3) }, 
-        shadowRadius: scale(5),
-        elevation: 3, 
-    },
+        borderRadius: scale(22),
+        marginVertical: scale(7),
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0px ${scale(3)}px ${scale(5)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+        } : {
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: scale(3) },
+            shadowOpacity: colors.shadowOpacity,
+            shadowRadius: scale(5),
+            elevation: 3,
+        }),
+    }),
     userMessageBubble: (colors) => ({
         backgroundColor: colors.messageUserBg,
         alignSelf: 'flex-end',
         marginRight:scale(10),
-        borderBottomRightRadius: scale(6), 
-        shadowColor: colors.shadowColor,
-        shadowOpacity: colors.shadowOpacity,
+        borderBottomRightRadius: scale(6),
     }),
     aiMessageBubble: (colors) => ({
         backgroundColor: colors.messageAiBg,
         alignSelf: 'flex-start',
         marginLeft:scale(10),
         borderBottomLeftRadius: scale(6),
-        shadowColor: colors.shadowColor,
-        shadowOpacity: colors.shadowOpacity * 0.7, 
     }),
     errorMessageBubble: (colors) => ({
-        backgroundColor: colors.danger + '2A', 
+        backgroundColor: colors.danger + '2A',
         borderColor: colors.danger,
         borderWidth: 1.5
     }),
-    rechartsContainer: (colors) => ({
+    chartContainer: (colors) => ({
         marginTop: scale(15),
-        width: '100%', 
+        width: '100%',
         minHeight: scale(220),
-        borderWidth: 1,
-        borderColor: colors.dividerColor, 
-        borderRadius: scale(14), 
-        overflow: 'hidden', 
-        backgroundColor: colors.bgCard,
-        padding: Platform.OS === 'web' ? scale(12) : 0,
-        shadowColor: colors.shadowColor,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: colors.shadowOpacity * 0.5,
-        shadowRadius: scale(4),
-        elevation: 2,
+        borderWidth: Platform.OS === 'web' ? 0 : 1,
+        borderColor: colors.dividerColor,
+        borderRadius: scale(14),
+        overflow: 'hidden',
+        backgroundColor: Platform.OS === 'web' ? 'transparent' : colors.bgCard,
+        padding: Platform.OS === 'web' ? 0 : scale(5),
+        ...(Platform.OS === 'web' ? {
+        } : {
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: colors.shadowOpacity * 0.5,
+            shadowRadius: scale(4),
+            elevation: 2,
+        }),
     }),
 
     initialGreetingScrollViewContainer: (colors) => ({
         flexGrow: 1,
         justifyContent: 'center',
-        alignItems: 'center', 
+        alignItems: 'center',
         backgroundColor: colors.bgSecondary,
-        paddingBottom: scale(35), 
+        paddingBottom: scale(35),
         paddingHorizontal: scale(10),
-        ...(Platform.OS === 'web' && { width: '100%', flex: 1 }) // Ensure it takes full space on web
+        ...(Platform.OS === 'web' && { width: '100%', flex: 1 })
     }),
     initialGreetingContainer: () => ({
         alignItems: 'center',
         paddingHorizontal: scale(20),
-        paddingVertical: scale(25), 
-        width: '100%', 
+        paddingVertical: scale(25),
+        width: '100%',
     }),
     greetingMainText: (colors) => ({
-        fontSize: scaleFont(screenWidth > 400 ? 44 : 38), 
-        fontWeight: '300', 
+        fontSize: scaleFont(screenWidth > 400 ? 44 : 38),
+        fontWeight: '300',
         color: colors.textPrimary,
         textAlign: 'center',
-        marginBottom: scale(10), 
-        fontFamily: 'Roboto-Light',
+        marginBottom: scale(10),
+        fontFamily: 'JetBrainsMono-Light',
         lineHeight: scaleFont(screenWidth > 400 ? 52 : 46),
-        ...(Platform.OS === 'web' && { textShadow: `0 1px 2px ${colors.shadowColor}`}),
+        ...(Platform.OS === 'web' && { textShadow: `0 1px 2px ${hexToRgba(colors.shadowColor, 0.3)}`}),
         ...(Platform.OS !== 'web' && {
             textShadowOffset: { width: 0, height: 1 },
             textShadowRadius: 2,
-            textShadowColor: colors.shadowColor,
+            textShadowColor: hexToRgba(colors.shadowColor, 0.3),
         }),
     }),
     greetingSubText: (colors) => ({
-        fontSize: scaleFont(screenWidth > 400 ? 21 : 19), 
+        fontSize: scaleFont(screenWidth > 400 ? 21 : 19),
         fontWeight: '400',
         color: colors.textSecondary,
         marginTop: scale(5),
-        marginBottom: scale(35), 
+        marginBottom: scale(35),
         textAlign: 'center',
-        fontFamily: 'Roboto-Regular', 
+        fontFamily: 'JetBrainsMono-Regular',
         lineHeight: scaleFont(screenWidth > 400 ? 28 : 26),
     }),
     suggestionCardsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-around', 
+        justifyContent: 'center', // Center items horizontally
+        alignItems: 'center',     // Center items vertically if they wrap (useful if heights varied)
         width: '100%',
-        paddingHorizontal: scale(5), 
     },
     suggestionCardWrapper: {
-        width: screenWidth > 750 ? '48%' : '100%', 
-        marginBottom: scale(18), 
-        paddingHorizontal: screenWidth > 750 ? scale(6) : 0, 
+        margin: scale(8), // Uniform margin around each card for minimal spacing
+        // alignItems: 'center', // Card has fixed width, wrapper will shrink. Not strictly needed.
     },
-    suggestionCard: (colors, borderColor) => ({
+    suggestionCard: (colors, borderColor) => ({ // The card itself
         backgroundColor: colors.bgCard,
-        borderRadius: scale(18), 
-        padding: scale(22), 
-        borderWidth: scale(2.5), 
+        borderRadius: scale(18),
+        padding: scale(18),
+        borderWidth: scale(2.5),
         borderColor: borderColor,
-        flexDirection: 'column', 
-        alignItems: 'flex-start', 
-        shadowColor: colors.shadowColor,
-        shadowOffset: { width: 0, height: scale(4) },
-        shadowOpacity: colors.shadowOpacity,
-        shadowRadius: scale(6),
-        elevation: 5,
-        minHeight: scale(130), 
-        justifyContent: 'space-between', 
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        width: scale(180), // Fixed width for square
+        height: scale(180), // Fixed height for square
+        justifyContent: 'space-between',
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0px ${scale(4)}px ${scale(6)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+        } : {
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: scale(4) },
+            shadowOpacity: colors.shadowOpacity,
+            shadowRadius: scale(6),
+            elevation: 5,
+        }),
     }),
     suggestionCardText: (colors) => ({
-        fontSize: scaleFont(15.5), 
-        fontWeight: '500', 
-        color: colors.textPrimary, 
-        fontFamily: 'Roboto-Medium', 
-        lineHeight: scaleFont(22), 
-        marginBottom: scale(12), 
+        fontSize: scaleFont(15.5),
+        fontWeight: '500',
+        color: colors.textPrimary,
+        fontFamily: 'JetBrainsMono-Medium',
+        lineHeight: scaleFont(21),
+        marginBottom: scale(10),
     }),
     suggestionCardIconContainer: (colors, iconBgColor) => ({
         padding: scale(10),
-        borderRadius: scale(22), 
-        backgroundColor: iconBgColor, 
-        alignSelf: 'flex-end', 
-        shadowColor: iconBgColor, 
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.5,
-        shadowRadius: 3,
-        elevation: 3,
+        borderRadius: scale(22),
+        backgroundColor: iconBgColor,
+        alignSelf: 'flex-end',
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0 2px 3px ${hexToRgba(iconBgColor, 0.5)}`,
+        } : {
+            shadowColor: iconBgColor,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.5,
+            shadowRadius: 3,
+            elevation: 3,
+        }),
     }),
 
     inputAreaContainer: (colors) => ({
-        paddingHorizontal: scale(18), 
+        paddingHorizontal: scale(18),
         paddingTop: scale(12),
         paddingBottom: Platform.OS === 'ios' ? scale(30) : (Platform.OS === 'web' ? scale(18) : scale(12)),
         backgroundColor: colors.bgInputArea,
         borderTopWidth: 1,
         borderTopColor: colors.dividerColor,
-        ...(Platform.OS === 'web' && { width: '100%' }), // Ensure full width on web
+        ...(Platform.OS === 'web' && { width: '100%' }),
     }),
     filePreviewContainer: (colors) => ({
         flexDirection: 'row',
@@ -1667,7 +1737,7 @@ const styles = StyleSheet.create({
         paddingVertical:scale(10),
         backgroundColor:colors.bgTertiary,
         borderRadius:scale(22),
-        marginBottom:scale(12), 
+        marginBottom:scale(12),
         borderWidth:1,
         borderColor:colors.borderColor
     }),
@@ -1677,221 +1747,281 @@ const styles = StyleSheet.create({
         marginRight:scale(10),
         color:colors.textSecondary,
         fontSize:scaleFont(14.5),
-        fontFamily: 'Roboto-Regular'
+        fontFamily: 'JetBrainsMono-Regular'
     }),
     inputWrapperGradient: (colors) => ({
-        borderRadius: scale(32), 
-        padding: scale(2.5), 
-        shadowColor: colors.shadowColor,
-        shadowOffset: { width: 0, height: scale(3) },
-        shadowOpacity: colors.shadowOpacity * 1.2, 
-        shadowRadius: scale(5),
-        elevation: 4,
+        borderRadius: scale(32),
+        padding: scale(2.5),
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0px ${scale(3)}px ${scale(5)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity * 1.2)}`,
+        } : {
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: scale(3) },
+            shadowOpacity: colors.shadowOpacity * 1.2,
+            shadowRadius: scale(5),
+            elevation: 4,
+        }),
     }),
     inputWrapper: (colors) => ({
         flexDirection: 'row',
-        alignItems: 'center', 
+        alignItems: 'center',
         backgroundColor: colors.inputBg,
-        borderRadius: scale(30), 
-        paddingHorizontal: scale(10), 
-        minHeight: scale(60), 
+        borderRadius: scale(30),
+        paddingHorizontal: scale(10),
+        minHeight: scale(60),
     }),
     textInput: (colors) => ({
         flex: 1,
         color: colors.textPrimary,
         fontSize: scaleFont(16.5),
-        paddingHorizontal: scale(18), 
-        paddingTop: Platform.OS === 'ios' ? scale(18) : scale(14), 
+        paddingHorizontal: scale(18),
+        paddingTop: Platform.OS === 'ios' ? scale(18) : scale(14),
         paddingBottom: Platform.OS === 'ios' ? scale(18) : scale(14),
         maxHeight: scale(125),
-        fontFamily: 'Roboto-Regular',
+        fontFamily: 'JetBrainsMono-Regular',
         lineHeight: scaleFont(22),
         ...(Platform.OS === 'web' && { outline: 'none', resize: 'none' }),
     }),
     inputIconButton: () => ({
-        padding: scale(12), 
+        padding: scale(12),
         justifyContent: 'center',
         alignItems: 'center',
     }),
     sendButton: (colors) => ({
         backgroundColor: colors.accentPrimary,
-        borderRadius: scale(24), 
-        width: scale(48), height: scale(48), 
+        borderRadius: scale(24),
+        width: scale(48), height: scale(48),
         margin: scale(5),
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0 2px 4px ${hexToRgba(colors.accentPrimary, 0.6)}`,
+        } : {
+            shadowColor: colors.accentPrimary,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.6,
+            shadowRadius: 3,
+            elevation: 3,
+        }),
     }),
     sendButtonDisabled: (colors) => ({ backgroundColor: colors.textPlaceholder, opacity: 0.7 }),
 
     footerContainer: (colors) => ({
-        paddingVertical: scale(14), 
+        paddingVertical: scale(14),
         paddingHorizontal: scale(18),
-        backgroundColor: colors.bgPrimary, 
+        backgroundColor: colors.bgPrimary,
         alignItems: 'center',
         borderTopWidth: 1,
         borderTopColor: colors.dividerColor,
-        ...(Platform.OS === 'web' && { display: 'none' }) 
+        ...(Platform.OS === 'web' && { display: 'none' })
     }),
     footerText: (colors) => ({
-        fontSize: scaleFont(11.5), 
+        fontSize: scaleFont(11.5),
         color: colors.textSecondary,
         textAlign: 'center',
-        fontFamily: 'Roboto-Regular',
+        fontFamily: 'JetBrainsMono-Regular',
         letterSpacing: 0.3,
     }),
 
-    modalOverlay: { 
-        flex: 1, 
-        backgroundColor: 'rgba(0,0,0,0.7)', 
-        justifyContent:'center', 
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent:'center',
         alignItems:'center',
         ...(Platform.OS === 'web' && { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000 })
     },
     menuModalBase: (colors) => ({
-        backgroundColor: colors.menuBg, 
-        borderRadius: scale(20), 
-        paddingBottom: scale(15), 
-        shadowColor: colors.shadowColor,
-        shadowOffset: { width: 0, height: scale(6) },
-        shadowOpacity: colors.shadowOpacity * 1.5, 
-        shadowRadius: scale(12),
-        elevation: 15,
-        overflow: 'hidden', 
+        backgroundColor: colors.menuBg,
+        borderRadius: scale(20),
+        paddingBottom: scale(15),
+        ...(Platform.OS === 'web' ? {
+            boxShadow: `0 ${scale(6)}px ${scale(12)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity * 1.5)}`,
+        } : {
+            shadowColor: colors.shadowColor,
+            shadowOffset: { width: 0, height: scale(6) },
+            shadowOpacity: colors.shadowOpacity * 1.5,
+            shadowRadius: scale(12),
+            elevation: 15,
+        }),
+        overflow: 'hidden',
     }),
-    hamburgerMenuModalPos: (colors) => ({ 
+    hamburgerMenuModalPos: (colors) => ({
         position: 'absolute',
         left: 0,
         top: 0, bottom: 0,
-        width: Math.min(screenWidth * 0.85, scale(320)), 
+        width: Math.min(screenWidth * 0.85, scale(320)),
         minWidth: scale(290),
         paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + scale(20) : (Platform.OS === 'web' ? scale(20) : scale(50)),
         ...(Platform.OS === 'web' && { height: '100vh' })
     }),
-    appNameDropdownModalPos: (colors) => ({ 
+    appNameDropdownModalPos: (colors) => ({
         position: 'absolute',
-        top: Platform.OS === 'android' ? StatusBar.currentHeight + scale(65) : (Platform.OS === 'web' ? scale(80) : scale(95)), 
+        top: Platform.OS === 'android' ? StatusBar.currentHeight + scale(65) : (Platform.OS === 'web' ? scale(80) : scale(95)),
         left: Platform.OS === 'web' ? SIDEBAR_WIDTH + scale(22) : SIDEBAR_WIDTH + scale(12),
-        width: screenWidth - SIDEBAR_WIDTH - scale(Platform.OS === 'web' ? 44 : 34), 
-        maxWidth: scale(400), 
-        paddingTop: scale(22), 
+        width: screenWidth - SIDEBAR_WIDTH - scale(Platform.OS === 'web' ? 44 : 34),
+        maxWidth: scale(400),
+        paddingTop: scale(22),
     }),
-    bankSelectionModalContent: (colors) => ({ 
-        marginHorizontal: scale(15), 
-        maxHeight: screenHeight * (Platform.OS === 'web' ? 0.9 : 0.8), 
-        width: screenWidth * (IS_SMALL_SCREEN ? 0.96 : (Platform.OS === 'web' ? 0.55 : 0.92)), 
-        maxWidth: scale(Platform.OS === 'web' ? 550 : 500), 
+    bankSelectionModalContent: (colors) => ({
+        marginHorizontal: scale(15),
+        maxHeight: screenHeight * (Platform.OS === 'web' ? 0.9 : 0.8),
+        width: screenWidth * (IS_SMALL_SCREEN ? 0.96 : (Platform.OS === 'web' ? 0.55 : 0.92)),
+        maxWidth: scale(Platform.OS === 'web' ? 550 : 500),
         paddingTop: scale(22),
         ...(Platform.OS === 'web' && { overflowY: 'auto' })
     }),
-    menuHeader: (colors) => ({ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        paddingHorizontal: scale(22), 
-        paddingVertical: scale(18), 
-        marginBottom: scale(18), 
-        borderBottomWidth:1, 
-        borderBottomColor: colors.dividerColor, 
+    menuHeader: (colors) => ({
+        flexDirection: 'row',
+        alignItems:'center',
+        paddingHorizontal: scale(22),
+        paddingVertical: scale(18),
+        marginBottom: scale(18),
+        borderBottomWidth:1,
+        borderBottomColor: colors.dividerColor,
     }),
-    menuAppIcon: { marginRight: scale(18) }, 
+    menuAppIcon: { marginRight: scale(18) },
     menuTitle: (colors) => ({ fontSize: scaleFont(21), fontWeight: 'bold', color: colors.textPrimary, flexShrink:1, fontFamily: 'JetBrainsMono-Bold' }),
     menuItem: (colors, isActive = false) => ({
         flexDirection: 'row', alignItems: 'center',
-        paddingVertical: scale(16), paddingHorizontal: scale(22), 
-        backgroundColor: isActive ? colors.accentPrimary + '33' : 'transparent', 
-        borderRadius: isActive ? scale(14) : 0, 
-        marginHorizontal: isActive ? scale(12) : 0, 
-        marginBottom: scale(6), 
-        borderLeftWidth: isActive ? scale(4) : 0, 
+        paddingVertical: scale(16), paddingHorizontal: scale(22),
+        backgroundColor: isActive ? colors.accentPrimary + '33' : 'transparent',
+        borderRadius: isActive ? scale(14) : 0,
+        marginHorizontal: isActive ? scale(12) : 0,
+        marginBottom: scale(6),
+        borderLeftWidth: isActive ? scale(4) : 0,
         borderLeftColor: isActive ? colors.accentPrimary : 'transparent',
     }),
     menuItemText: (colors, isActive = false) => ({
-        fontSize: scaleFont(16), 
+        fontSize: scaleFont(16),
         color: isActive ? colors.accentPrimary : colors.textPrimary,
-        marginLeft: scale(22), 
+        marginLeft: scale(22),
         fontWeight: isActive ? 'bold' : '500',
-        fontFamily: isActive ? 'Roboto-Bold' : 'Roboto-Medium',
+        fontFamily: isActive ? 'JetBrainsMono-Bold' : 'JetBrainsMono-Medium',
     }),
-    modalTitle: (colors) => ({ fontSize: scaleFont(23), fontWeight: 'bold', color: colors.textPrimary, marginBottom: scale(28), textAlign: 'center', paddingHorizontal:scale(18), fontFamily: 'Roboto-Bold' }),
+    modalTitle: (colors) => ({ fontSize: scaleFont(23), fontWeight: 'bold', color: colors.textPrimary, marginBottom: scale(28), textAlign: 'center', paddingHorizontal:scale(18), fontFamily: 'JetBrainsMono-Bold' }),
 
     settingItem: (colors, noBorder = false) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scale(20), paddingHorizontal:scale(22), borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: colors.dividerColor }),
     settingItemModal: (colors, noBorder = false) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scale(16), paddingHorizontal:scale(22), borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: colors.dividerColor + 'AA', width: '100%' }),
     settingIcon: () => ({ marginRight: scale(20) }),
-    settingLabel: (colors) => ({ fontSize: scaleFont(16.5), color: colors.textPrimary, flex: 1, fontFamily: 'Roboto-Regular' }),
-    themeToggleButton: (colors) => ({ paddingVertical: scale(11), paddingHorizontal: scale(16), backgroundColor: colors.accentPrimary, borderRadius: scale(28), minWidth: scale(125), alignItems:'center', shadowColor: colors.shadowColor, shadowOffset: {width:0, height:2}, shadowOpacity: colors.shadowOpacity * 0.8, shadowRadius: scale(3), elevation: 2}),
-    themeToggleButtonText: (colors) => ({ color: colors.buttonText, fontSize: scaleFont(14.5), fontWeight: 'bold', fontFamily: 'Roboto-Bold' }),
+    settingLabel: (colors) => ({ fontSize: scaleFont(16.5), color: colors.textPrimary, flex: 1, fontFamily: 'JetBrainsMono-Regular' }),
+    themeToggleButton: (colors) => ({ paddingVertical: scale(11), paddingHorizontal: scale(16), backgroundColor: colors.accentPrimary, borderRadius: scale(28), minWidth: scale(125), alignItems:'center', ...(Platform.OS === 'web' ? {
+            boxShadow: `0 2px 3px ${hexToRgba(colors.shadowColor, colors.shadowOpacity * 0.8)}`,
+        } : {
+            shadowColor: colors.shadowColor, shadowOffset: {width:0, height:2}, shadowOpacity:colors.shadowOpacity * 0.8, shadowRadius: scale(3), elevation: 2
+        })}),
+    themeToggleButtonText: (colors) => ({ color: colors.buttonText, fontSize: scaleFont(14.5), fontWeight: 'bold', fontFamily: 'JetBrainsMono-Bold' }),
 
     pickerContainerDropdown: (colors) => ({ borderWidth: 1.5, borderColor: colors.borderColor, borderRadius: scale(14), backgroundColor: colors.inputBg, justifyContent: 'center', minWidth: scale(165), maxWidth: screenWidth * (IS_SMALL_SCREEN ? 0.42 : 0.48), marginLeft: scale(12)}),
     pickerContainerPrefs: (colors) => ({ borderWidth: 1.5, borderColor: colors.borderColor, borderRadius: scale(14), backgroundColor: colors.inputBg, justifyContent: 'center', flex: 1, marginLeft: scale(14)}),
-    pickerStyle: (colors) => ({ 
-        height: scale(54), 
-        color: colors.textPrimary, 
-        width:'100%', 
+    pickerStyle: (colors) => ({
+        height: scale(54),
+        color: colors.textPrimary,
+        width:'100%',
         fontSize: scaleFont(15.5),
-        fontFamily: 'Roboto-Regular',
+        fontFamily: 'JetBrainsMono-Regular',
         ...(Platform.OS === 'web' && { border: 'none', background: 'transparent', paddingLeft: 12, paddingRight: 12, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' })
-    }), 
-    pickerItemStyle: (colors) => ({ 
-        color: colors.textPrimary, 
+    }),
+    pickerItemStyle: (colors) => ({
+        color: colors.textPrimary,
         fontSize: scaleFont(16.5),
-        fontFamily: 'Roboto-Regular',
-        ...(Platform.OS === 'web' && { backgroundColor: colors.menuBg }) // For dropdown options background on web
-    }), 
+        fontFamily: 'JetBrainsMono-Regular',
+        ...(Platform.OS === 'web' && { backgroundColor: colors.menuBg })
+    }),
 
     checkboxBase: (colors) => ({ width: scale(30), height: scale(30), justifyContent: 'center', alignItems: 'center', borderRadius: scale(10), borderWidth: 2.5, borderColor: colors.accentPrimary, backgroundColor: colors.inputBg, marginLeft: scale(14) }),
     checkboxChecked: (colors) => ({ backgroundColor: colors.accentPrimary, borderColor: colors.accentPrimary }),
-    actionButton: (colors) => ({ backgroundColor: colors.accentPrimary, paddingVertical: scale(18), paddingHorizontal: scale(38), borderRadius: scale(100), alignSelf: 'center', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginTop:scale(38), shadowColor: colors.shadowColor, shadowOffset:{width:0, height:scale(4)}, shadowOpacity:colors.shadowOpacity * 1.5, shadowRadius:scale(5), elevation:5 }),
-    actionButtonText: (colors) => ({ color: colors.buttonText, fontSize: scaleFont(16), fontWeight: 'bold', fontFamily: 'Roboto-Bold', letterSpacing: 0.2 }),
+    actionButton: (colors) => ({ backgroundColor: colors.accentPrimary, paddingVertical: scale(18), paddingHorizontal: scale(38), borderRadius: scale(100), alignSelf: 'center', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginTop:scale(38), ...(Platform.OS === 'web' ? {
+            boxShadow: `0 ${scale(4)}px ${scale(5)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+        } : {
+            shadowColor: colors.shadowColor, shadowOffset:{width:0,height:scale(4)}, shadowOpacity:colors.shadowOpacity, shadowRadius:scale(5), elevation:5
+        }) }),
+    actionButtonText: (colors) => ({ color: colors.buttonText, fontSize: scaleFont(16), fontWeight: 'bold', fontFamily: 'JetBrainsMono-Bold', letterSpacing: 0.2 }),
 
-    panelContainer: (colors) => ({ 
-        flex: 1, 
-        backgroundColor: colors.bgSecondary, 
-        padding:scale(22),
-        ...(Platform.OS === 'web' && { overflowY: 'auto', height: `calc(100vh - ${scale(75) + scale(72)}px)` }) // Adjust height for topbar and input area on web
+    panelContainer: (colors) => ({
+        flex: 1,
+        backgroundColor: colors.bgSecondary,
+        ...(Platform.OS === 'web' && {
+            overflowY: 'auto',
+            height: `calc(100vh - ${scale(75)}px)`
+        })
     }),
-    panelScrollView: (colors) => ({ 
-        flex: 1, 
+    panelScrollView: (colors) => ({
+        flex: 1,
         backgroundColor: colors.bgSecondary,
     }),
-    panelContent: () => ({ paddingHorizontal: 0, paddingVertical: scale(12), paddingBottom: scale(45) }), 
-    panelHeader: (colors, centered = false) => ({ flexDirection: 'row', alignItems: 'center', marginBottom: scale(28), paddingBottom:scale(18), borderBottomWidth:1.5, borderBottomColor: colors.dividerColor, justifyContent: centered ? 'center' : 'flex-start' }),
-    panelTitle: (colors) => ({ fontSize: scaleFont(25), fontWeight: 'bold', color: colors.textPrimary, marginLeft: scale(14), flex:1, fontFamily: 'Roboto-Bold' }),
+    panelContent: () => ({ paddingHorizontal: scale(22), paddingVertical: scale(12), paddingBottom: scale(45) }),
+    panelHeader: (colors, centered = false) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: scale(28),
+        paddingBottom:scale(18),
+        borderBottomWidth:1.5,
+        borderBottomColor: colors.dividerColor,
+        justifyContent: centered ? 'center' : 'flex-start',
+        paddingHorizontal: Platform.OS === 'web' ? scale(15) : scale(22)
+    }),
+    panelTitle: (colors) => ({ fontSize: scaleFont(25), fontWeight: 'bold', color: colors.textPrimary, marginLeft: scale(14), flex:1, fontFamily: 'JetBrainsMono-Bold' }),
 
-    historyListItem: (colors) => ({ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, paddingVertical:scale(16), paddingHorizontal:scale(20), borderRadius:scale(14), marginBottom:scale(14), shadowColor: colors.shadowColor, shadowOffset:{width:0,height:scale(3)}, shadowOpacity:colors.shadowOpacity, shadowRadius:scale(4), elevation:3 }),
-    historyItemTitle: (colors) => ({ fontSize:scaleFont(16.5), fontWeight:'bold', color:colors.textPrimary, marginBottom:scale(5), fontFamily: 'Roboto-Bold' }),
-    historyItemDate: (colors) => ({ fontSize:scaleFont(12.5), color:colors.textSecondary, fontFamily: 'Roboto-Regular' }),
+    historyListItem: (colors) => ({ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bgCard, paddingVertical:scale(16), paddingHorizontal:scale(20), borderRadius:scale(14), marginBottom:scale(14), ...(Platform.OS === 'web' ? {
+            boxShadow: `0 ${scale(3)}px ${scale(4)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+        } : {
+            shadowColor: colors.shadowColor, shadowOffset:{width:0,height:scale(3)}, shadowOpacity:colors.shadowOpacity, shadowRadius:scale(4), elevation:3
+        }) }),
+    historyItemTitle: (colors) => ({ fontSize:scaleFont(16.5), fontWeight:'bold', color:colors.textPrimary, marginBottom:scale(5), fontFamily: 'JetBrainsMono-Bold' }),
+    historyItemDate: (colors) => ({ fontSize:scaleFont(12.5), color:colors.textSecondary, fontFamily: 'JetBrainsMono-Regular' }),
     clearHistoryButton: (colors) => ({ flexDirection:'row', alignItems:'center', paddingVertical:scale(8), paddingHorizontal:scale(14), borderRadius:scale(22), backgroundColor: colors.danger + '2A'}),
-    clearHistoryButtonText: (colors) => ({ color: colors.danger, fontSize:scaleFont(13.5), marginLeft:scale(8), fontWeight:'bold', fontFamily: 'Roboto-Bold'}),
+    clearHistoryButtonText: (colors) => ({ color: colors.danger, fontSize:scaleFont(13.5), marginLeft:scale(8), fontWeight:'bold', fontFamily: 'JetBrainsMono-Bold'}),
     emptyStateContainer: () => ({ flex:1, justifyContent:'center', alignItems:'center', padding:scale(25) }),
-    emptyStateText: (colors) => ({ fontSize:scaleFont(17.5), color:colors.textPlaceholder, marginTop:scale(18), textAlign:'center', fontFamily: 'Roboto-Regular', lineHeight: scaleFont(25) }),
+    emptyStateText: (colors) => ({ fontSize:scaleFont(17.5), color:colors.textPlaceholder, marginTop:scale(18), textAlign:'center', fontFamily: 'JetBrainsMono-Regular', lineHeight: scaleFont(25) }),
 
-    settingGroup: (colors) => ({ marginBottom: scale(32), backgroundColor: colors.bgCard, borderRadius:scale(16), paddingVertical:scale(12), shadowColor: colors.shadowColor, shadowOffset:{width:0,height:scale(3)}, shadowOpacity:colors.shadowOpacity, shadowRadius:scale(4), elevation:3}),
-    settingGroupTitle: (colors) => ({ fontSize:scaleFont(15), fontWeight:'bold', color:colors.textSecondary, paddingHorizontal:scale(22), paddingTop:scale(18), paddingBottom:scale(10), textTransform:'uppercase', letterSpacing:0.3, fontFamily: 'Roboto-Bold' }), 
-    profileTextInput: (colors) => ({ 
-        flex:1, 
-        color: colors.textPrimary, 
-        fontSize: scaleFont(16.5), 
-        paddingVertical:scale(12), 
-        textAlign:'right', 
-        fontFamily: 'Roboto-Regular',
+    settingGroup: (colors) => ({ marginBottom: scale(32), backgroundColor: colors.bgCard, borderRadius:scale(16), paddingVertical:scale(12), ...(Platform.OS === 'web' ? {
+            boxShadow: `0 ${scale(3)}px ${scale(4)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+        } : {
+            shadowColor: colors.shadowColor, shadowOffset:{width:0,height:scale(3)}, shadowOpacity:colors.shadowOpacity, shadowRadius:scale(4), elevation:3
+        })}),
+    settingGroupTitle: (colors) => ({ fontSize:scaleFont(15), fontWeight:'bold', color:colors.textSecondary, paddingHorizontal:scale(22), paddingTop:scale(18), paddingBottom:scale(10), textTransform:'uppercase', letterSpacing:0.3, fontFamily: 'JetBrainsMono-Bold' }),
+    settingDescription: (colors) => ({
+        fontSize: scaleFont(13.5),
+        color: colors.textSecondary,
+        fontFamily: 'JetBrainsMono-Regular',
+        paddingHorizontal: scale(22),
+        paddingBottom: scale(18),
+        marginTop: scale(-8),
+        lineHeight: scaleFont(19),
+    }),
+    profileTextInput: (colors) => ({
+        flex:1,
+        color: colors.textPrimary,
+        fontSize: scaleFont(16.5),
+        paddingVertical:scale(12),
+        textAlign:'right',
+        fontFamily: 'JetBrainsMono-Regular',
         ...(Platform.OS === 'web' && { backgroundColor: 'transparent', border: 'none', outline: 'none' })
     }),
 
-    bankListItem: (colors, isSelected) => ({
+    bankListItem: (colors) => ({
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: scale(16), 
+        paddingVertical: scale(16),
         paddingHorizontal: scale(20),
-        borderRadius: scale(14), 
-        backgroundColor: isSelected ? colors.accentPrimary + '33' : colors.bgTertiary,
-        marginBottom: scale(12), 
-        borderWidth: 1.5,
-        borderColor: isSelected ? colors.accentPrimary : colors.borderColor,
+        borderRadius: scale(14),
+        backgroundColor: colors.bgTertiary,
+        marginBottom: scale(12),
     }),
-    bankLogo: (colors) => ({ width: scale(44), height: scale(44), borderRadius: scale(22), marginRight: scale(20), backgroundColor: colors.bgWhite, padding: scale(2), borderWidth:1, borderColor: colors.borderColor }), 
-    bankName: (colors, isSelected) => ({
+    bankLogo: (colors) => ({ width: scale(44), height: scale(44), borderRadius: scale(22), marginRight: scale(20), backgroundColor: colors.bgWhite, padding: scale(2), borderWidth:1, borderColor: colors.borderColor }),
+    bankName: (colors) => ({
         flex: 1,
         fontSize: scaleFont(16.5),
-        color: isSelected ? colors.accentPrimary : colors.textPrimary,
-        fontWeight: isSelected ? 'bold' : '500',
-        fontFamily: isSelected ? 'Roboto-Bold' : 'Roboto-Medium',
+        color: colors.textPrimary,
+        fontWeight: '500',
+        fontFamily: 'JetBrainsMono-Medium',
     }),
     bankListSeparator: (colors) => ({ height: 1.5, backgroundColor: colors.dividerColor, marginVertical: scale(5) }),
+    infoText: (colors) => ({
+        color: colors.textSecondary,
+        fontSize: scaleFont(14.5),
+        textAlign: 'center',
+        paddingHorizontal: scale(20),
+        paddingVertical: scale(15),
+        fontFamily: 'JetBrainsMono-Regular',
+        lineHeight: scaleFont(20),
+    }),
 });

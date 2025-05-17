@@ -21,6 +21,7 @@
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-google-charts": "^5.2.1",
     "react-native": "0.79.2",
     "react-native-animatable": "^1.4.0",
     "react-native-dotenv": "^3.4.11",
