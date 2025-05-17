@@ -165,6 +165,7 @@ const AI_MODELS_DISPLAY = {
 };
 const GEMINI_MODEL_MAPPING = {
     "WalkerTECH_Pro_Max": "gemini-2.5-pro-preview-05-06",
+    "WalkerTECH_Pro": "gemini-2.0-flash",
     "WalkerTECH_1.5_Flash": "gemini-1.5-flash",
     "WalkerTECH_Compact": "gemini-1.5-pro",
 };
@@ -383,9 +384,9 @@ export default function WalkerTECHFinancerAI() {
     const showErrorToUser = (message) => {
         console.error("USER_ERROR_DISPLAY:", message);
         if (Platform.OS !== 'web') {
-            alert(message);
+            alert(message); // Native Alert
         } else {
-            console.warn("User Info/Error (Web):", message);
+            console.warn("User Info/Error (Web):", message); // Web Console
         }
     };
 
@@ -467,48 +468,61 @@ export default function WalkerTECHFinancerAI() {
         setIsLoading(true);
         setMessageInput('');
 
-        const userMsgIdBase = `user-${Date.now()}`;
+        const userMsgIdBase = `user-${Date.now()}`; // Base ID for user messages in this interaction
+        const interactionTimestamp = Date.now(); // Consistent timestamp for this interaction
         let newMessagesPayload = [];
 
         if (currentFile) {
-            newMessagesPayload.push({ id: `${userMsgIdBase}-file`, text: `Arquivo: ${currentFile.name}`, sender: 'user', timestamp: Date.now(), fileInfo: { name: currentFile.name, type: currentFile.mimeType } });
+            // Message for the file itself
+            newMessagesPayload.push({
+                id: `${userMsgIdBase}-file-${interactionTimestamp}`, // Unique ID for the file message part
+                text: `Arquivo: ${currentFile.name}`, // This text will be displayed
+                sender: 'user',
+                timestamp: interactionTimestamp,
+                fileInfo: { name: currentFile.name, type: currentFile.mimeType }
+            });
         }
         if (currentMessageText) {
-            newMessagesPayload.push({ id: userMsgIdBase, text: currentMessageText, sender: 'user', timestamp: Date.now() });
+            // Message for the text typed by the user
+            newMessagesPayload.push({
+                id: `${userMsgIdBase}-text-${interactionTimestamp}`, // Unique ID for the text message part
+                text: currentMessageText,
+                sender: 'user',
+                timestamp: interactionTimestamp
+                // No fileInfo here
+            });
         }
         setMessages(prev => [...prev, ...newMessagesPayload]);
 
         const aiMessageId = `ai-${aiMessageIdCounter}`;
         setAiMessageIdCounter(prev => prev + 1);
-        const initialAiMsg = { id: aiMessageId, text: "", sender: 'ai', isStreaming: true, timestamp: Date.now() };
+        const initialAiMsg = { id: aiMessageId, text: "", sender: 'ai', isStreaming: true, timestamp: Date.now() }; // AI message gets its own timestamp
         setMessages(prev => [...prev, initialAiMsg]);
 
-        try {
-            const modelNameFromKey = GEMINI_MODEL_MAPPING[selectedAiModelKey] || GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
-            let effectiveModelName = modelNameFromKey;
-
+        // Determine effective model name (copied from your existing logic)
+        const modelNameFromKey = GEMINI_MODEL_MAPPING[selectedAiModelKey] || GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
+        let effectiveModelName = modelNameFromKey;
+        if (!AI_MODELS_DISPLAY[effectiveModelName]) {
+            console.warn(`Model ID ${effectiveModelName} from mapping key ${selectedAiModelKey} is not in AI_MODELS_DISPLAY. Falling back to default.`);
+            effectiveModelName = GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
             if (!AI_MODELS_DISPLAY[effectiveModelName]) {
-                console.warn(`Model ID ${effectiveModelName} from mapping key ${selectedAiModelKey} is not in AI_MODELS_DISPLAY. Falling back to default.`);
-                effectiveModelName = GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY];
-                 if (!AI_MODELS_DISPLAY[effectiveModelName]) {
-                    effectiveModelName = "gemini-1.5-flash";
-                    console.warn(`Default model ${GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY]} also not in AI_MODELS_DISPLAY. Using ${effectiveModelName}.`);
-                 }
+                effectiveModelName = "gemini-1.5-flash";
+                console.warn(`Default model ${GEMINI_MODEL_MAPPING[DEFAULT_MODEL_KEY]} also not in AI_MODELS_DISPLAY. Using ${effectiveModelName}.`);
             }
-
-            if (currentFile || enableDeepResearch) {
-                const advancedModelKey = "WalkerTECH_Pro_Max";
-                const advancedModelId = GEMINI_MODEL_MAPPING[advancedModelKey];
-                if (effectiveModelName !== advancedModelId && AI_MODELS_DISPLAY[advancedModelId]) {
-                     console.warn(`Arquivo anexado ou pesquisa aprofundada habilitada. Trocando modelo de ${effectiveModelName} para ${advancedModelId} para melhor suporte. Este modelo pode incorrer em custos.`);
-                     effectiveModelName = advancedModelId;
-                } else if (effectiveModelName !== advancedModelId && !AI_MODELS_DISPLAY[advancedModelId]) {
-                    console.warn(`Modelo avançado ${advancedModelId} não encontrado em AI_MODELS_DISPLAY. Mantendo ${effectiveModelName}.`);
-                }
+        }
+        if (currentFile || enableDeepResearch) {
+            const advancedModelKey = "WalkerTECH_Pro_Max";
+            const advancedModelId = GEMINI_MODEL_MAPPING[advancedModelKey];
+            if (effectiveModelName !== advancedModelId && AI_MODELS_DISPLAY[advancedModelId]) {
+                 console.log(`Arquivo anexado ou pesquisa aprofundada habilitada. Trocando modelo de ${AI_MODELS_DISPLAY[effectiveModelName] || effectiveModelName} para ${AI_MODELS_DISPLAY[advancedModelId]} para melhor suporte. Este modelo pode incorrer em custos.`);
+                 effectiveModelName = advancedModelId;
+            } else if (effectiveModelName !== advancedModelId && !AI_MODELS_DISPLAY[advancedModelId]) {
+                console.warn(`Modelo avançado ${advancedModelId} não encontrado em AI_MODELS_DISPLAY. Mantendo ${AI_MODELS_DISPLAY[effectiveModelName] || effectiveModelName}.`);
             }
+        }
 
+        try {
             const modelConfig = {
-                model: effectiveModelName,
                 safetySettings: [
                     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
                     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -517,27 +531,27 @@ export default function WalkerTECHFinancerAI() {
                 ],
                 generationConfig: { temperature: 0.7 }
             };
-
             if (enableDeepResearch) {
                 modelConfig.tools = tools;
                 modelConfig.toolConfig = { functionCallingConfig: { mode: FunctionCallingMode.AUTO } };
             }
-
-            const generativeModel = genAI.getGenerativeModel(modelConfig);
+            const generativeModel = genAI.getGenerativeModel({model: effectiveModelName, ...modelConfig});
 
             let currentChatInstance = chatSession;
             if (!currentChatInstance) {
                 const sdkChatHistory = messages
-                    .filter(msg => msg.id !== aiMessageId && !msg.isError && (msg.sender === 'user' || msg.sender === 'ai') && !msg.fileInfo && !msg.isStreaming)
+                    // Filter out the current AI streaming message and any purely "file info" user messages
+                    .filter(msg => msg.id !== aiMessageId && !msg.isError && (msg.sender === 'user' || msg.sender === 'ai') && !msg.isStreaming)
+                    .filter(msg => !(msg.sender === 'user' && msg.fileInfo && msg.text === `Arquivo: ${msg.fileInfo.name}`)) // Exclude file-only display messages from history for AI
                     .map(msg => ({
                         role: msg.sender === 'user' ? 'user' : 'model',
-                        parts: [{ text: msg.text }],
+                        parts: [{ text: msg.text }], // Only pass the actual text
                     }));
 
                 let systemInstructionText = `Você é ${APP_NAME_DISPLAY}, um assistente financeiro especializado em finanças e investimentos no Brasil. Responda em Português Brasileiro. Seja cordial e use emojis de forma sutil e apropriada para tornar a conversa mais amigável. Utilize a família de fontes 'JetBrains Mono' para formatação de código e dados tabulares quando apropriado. Quando precisar apresentar dados tabulares, formate-os como tabelas Markdown com cabeçalhos e linhas claramente definidos.`;
                 if (selectedBank && selectedBank.id !== 'none') systemInstructionText += ` Contexto bancário atual: ${selectedBank.name}.`;
-                if (userProfile) systemInstructionText += ` Perfil do usuário: Nome: ${userProfile.name}, Plano: ${userProfile.plan}.`;
-                if (analysisPreferences) systemInstructionText += ` Preferências de Análise: Risco: ${analysisPreferences.risk}, Horizonte de Investimento: ${analysisPreferences.horizon}.`;
+                if (userProfile) systemInstructionText += ` Perfil do usuário: Nome: ${userProfile.name || 'não definido'}, Plano: ${userProfile.plan || 'não definido'}.`; // Add fallbacks for safety
+                if (analysisPreferences) systemInstructionText += ` Preferências de Análise: Risco: ${analysisPreferences.risk || 'não definido'}, Horizonte de Investimento: ${analysisPreferences.horizon || 'não definido'}.`; // Add fallbacks
 
                 const currentThemeColorsForPrompt = themes[themeMode];
                 systemInstructionText += ` Se solicitado um gráfico, forneça uma estrutura JSON como esta: {"text": "Sua explicação textual sobre o gráfico...", "google_chart_config": { "chartType": "BarChart", "data": [["Cabeçalho1", "Cabeçalho2"], ["DadoA1", 10], ["DadoB1", 20]], "options": { "title": "Título do Gráfico", "backgroundColor": "transparent", "fontName": "JetBrainsMono-Regular", "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Bold"}, "legend": {"textStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}}, "hAxis": {"textStyle": {"color": "${currentThemeColorsForPrompt.textSecondary}", "fontName": "JetBrainsMono-Regular"}, "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}, "gridlines": {"color": "${currentThemeColorsForPrompt.dividerColor}"}}, "vAxis": {"textStyle": {"color": "${currentThemeColorsForPrompt.textSecondary}", "fontName": "JetBrainsMono-Regular"}, "titleTextStyle": {"color": "${currentThemeColorsForPrompt.textPrimary}", "fontName": "JetBrainsMono-Regular"}, "gridlines": {"color": "${currentThemeColorsForPrompt.dividerColor}"}}, "colors": ["${currentThemeColorsForPrompt.accentPrimary}", "${currentThemeColorsForPrompt.accentSecondary}", "${currentThemeColorsForPrompt.success}", "${currentThemeColorsForPrompt.warning}", "${currentThemeColorsForPrompt.magenta}"], "chartArea": {"backgroundColor": "transparent"} }, "width": "100%", "height": "350px" } }. Use cores do tema fornecidas para textos, eixos e grades (como 'gridlines.color'). Para as cores das séries (array 'colors' nas 'options'), use o conjunto de cores vibrantes fornecido. Se não houver gráfico, apenas forneça a resposta textual. Certifique-se que o JSON seja válido. O tipo 'chartType' pode ser 'BarChart', 'LineChart', 'PieChart', 'ColumnChart', etc. A propriedade 'height' define a altura do gráfico em pixels (ex: '350px' ou 350). 'fontName' deve ser 'JetBrainsMono-Regular' ou 'JetBrainsMono-Bold' onde aplicável.`;
@@ -549,28 +563,122 @@ export default function WalkerTECHFinancerAI() {
                 currentChatInstance = generativeModel.startChat({
                     history: sdkChatHistory,
                     systemInstruction: { parts: [{ text: systemInstructionText }], role: "system" },
-                    tools: enableDeepResearch ? tools : undefined,
-                    toolConfig: enableDeepResearch ? { functionCallingConfig: { mode: FunctionCallingMode.AUTO } } : undefined,
                 });
                 setChatSession(currentChatInstance);
             }
 
             let currentRequestParts = [];
             if (currentFile) {
-                if (Platform.OS === 'web' && currentFile.uri.startsWith('blob:')) {
-                    console.warn("Handling blob URI on web for file upload. Ensure this is supported by your FileSystem setup or browser capabilities.");
-                }
-                const fileBase64 = await FileSystem.readAsStringAsync(currentFile.uri, { encoding: FileSystem.EncodingType.Base64 });
-                currentRequestParts.push({ inlineData: { mimeType: currentFile.mimeType, data: fileBase64 } });
+                let fileBase64;
+                let fileMimeType = currentFile.mimeType;
 
-                if (!currentMessageText) {
-                     currentRequestParts.push({ text: `Analise este arquivo: ${currentFile.name}` });
+                if (Platform.OS === 'web') {
+                    if (currentFile.originalFile instanceof File) {
+                        try {
+                            fileBase64 = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const parts = typeof reader.result === 'string' ? reader.result.split(',') : [];
+                                    if (parts.length === 2) {
+                                        resolve(parts[1]);
+                                    } else {
+                                        reject(new Error("Formato de Data URL inválido retornado pelo FileReader."));
+                                    }
+                                };
+                                reader.onerror = (error) => {
+                                    console.error("Erro no FileReader:", error);
+                                    reject(error);
+                                };
+                                reader.readAsDataURL(currentFile.originalFile);
+                            });
+                            if (!fileMimeType && currentFile.originalFile.type) {
+                                fileMimeType = currentFile.originalFile.type;
+                            }
+                        } catch (e) {
+                            console.error("Erro ao ler arquivo na web com FileReader:", e);
+                            showErrorToUser(`Erro ao processar o arquivo ${currentFile.name} na web. Tente novamente. Detalhe: ${e.message}`);
+                            finalizeAiMessage(aiMessageId, `Falha ao ler o arquivo ${currentFile.name} na web.`, true, null);
+                            setCurrentFile(null);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } else if (currentFile.uri && currentFile.uri.startsWith('blob:')) {
+                        try {
+                            const response = await fetch(currentFile.uri);
+                            if (!response.ok) {
+                                throw new Error(`Falha ao buscar blob: ${response.statusText}`);
+                            }
+                            const blob = await response.blob();
+                             if (!fileMimeType && blob.type) {
+                                fileMimeType = blob.type;
+                            }
+                            fileBase64 = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                    const parts = typeof reader.result === 'string' ? reader.result.split(',') : [];
+                                    if (parts.length === 2) {
+                                        resolve(parts[1]);
+                                    } else {
+                                        reject(new Error("Formato de Data URL inválido retornado pelo FileReader (blob)."));
+                                    }
+                                };
+                                reader.onerror = (error) => {
+                                     console.error("Erro no FileReader (blob):", error);
+                                    reject(error);
+                                };
+                                reader.readAsDataURL(blob);
+                            });
+                        } catch (e) {
+                            console.error("Erro ao ler arquivo blob na web:", e);
+                            showErrorToUser(`Erro ao processar o arquivo blob ${currentFile.name} na web. Detalhe: ${e.message}`);
+                            finalizeAiMessage(aiMessageId, `Falha ao ler o arquivo blob ${currentFile.name} na web.`, true, null);
+                            setCurrentFile(null);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } else {
+                        console.error("Não foi possível ler o arquivo na web: nem currentFile.originalFile nem blob URI válida foram encontrados.");
+                        showErrorToUser(`Não foi possível ler o arquivo ${currentFile.name} na web.`);
+                        finalizeAiMessage(aiMessageId, `Falha ao carregar o arquivo ${currentFile.name} na web.`, true, null);
+                        setCurrentFile(null);
+                        setIsLoading(false);
+                        return;
+                    }
                 } else {
-                    currentRequestParts.push({ text: currentMessageText });
+                    try {
+                        fileBase64 = await FileSystem.readAsStringAsync(currentFile.uri, { encoding: FileSystem.EncodingType.Base64 });
+                    } catch (e) {
+                        console.error("Error reading native file with FileSystem:", e);
+                        showErrorToUser(`Erro ao processar o arquivo ${currentFile.name}. Tente novamente. Detalhe: ${e.message}`);
+                        finalizeAiMessage(aiMessageId, `Falha ao ler o arquivo ${currentFile.name}.`, true, null);
+                        setCurrentFile(null);
+                        setIsLoading(false);
+                        return;
+                    }
                 }
-            } else {
-                 currentRequestParts.push({ text: currentMessageText || "Olá 👋" });
+
+                if (!fileMimeType) {
+                    console.warn(`MimeType do arquivo '${currentFile.name}' não pôde ser determinado, usando 'application/octet-stream' como fallback.`);
+                    fileMimeType = 'application/octet-stream';
+                }
+                if (typeof fileBase64 !== 'string') {
+                    console.error(`fileBase64 para '${currentFile.name}' não foi definido corretamente antes de enviar para a IA.`);
+                     finalizeAiMessage(aiMessageId, `Erro interno ao preparar o arquivo ${currentFile.name}.`, true, null);
+                     setCurrentFile(null);
+                    setIsLoading(false);
+                    return;
+                }
+
+                currentRequestParts.push({ inlineData: { mimeType: fileMimeType, data: fileBase64 } });
+                if (!currentMessageText) { // If only a file is sent
+                     currentRequestParts.push({ text: `Analise este arquivo: ${currentFile.name}` }); // Add context for the file
+                } else {
+                    currentRequestParts.push({ text: currentMessageText }); // File is primary, text is context
+                }
+            } else { // No file attached
+                 currentRequestParts.push({ text: currentMessageText || "Olá 👋" }); // If only text or no input
             }
+
 
             // eslint-disable-next-line no-constant-condition
             while (true) {
@@ -640,14 +748,23 @@ export default function WalkerTECHFinancerAI() {
                         }];
                     }
                 } else {
-                    let finalReplyText = messages.find(m => m.id === aiMessageId)?.text || aggregatedResponseText;
+                    const finalResponse = await result.response;
+                    let finalReplyText = ""; // Start with empty
+                    if(finalResponse.text){ // Prefer text from final response object
+                        finalReplyText = finalResponse.text();
+                    } else { // Fallback to aggregated, though usually finalResponse.text() is reliable
+                        finalReplyText = messages.find(m => m.id === aiMessageId)?.text || aggregatedResponseText;
+                    }
+
                     let extractedGoogleChartConfig = null;
                     try {
-                        const jsonRegex = /```json\s*([\s\S]*?)\s*```|({[\s\S]*})/;
+                        const jsonRegex = /```json\s*([\s\S]*?)\s*```|({(?:[^{}]*|{(?:[^{}]*|{[^{}]*})*})*})/s;
                         const match = finalReplyText.match(jsonRegex);
+
                         if (match) {
                             const jsonString = match[1] || match[2];
                             const parsedJson = JSON.parse(jsonString.trim());
+
                             if (parsedJson && parsedJson.google_chart_config && parsedJson.google_chart_config.chartType && parsedJson.google_chart_config.data) {
                                 extractedGoogleChartConfig = parsedJson.google_chart_config;
                                 const textFromJSON = typeof parsedJson.text === 'string' ? parsedJson.text : null;
@@ -660,7 +777,6 @@ export default function WalkerTECHFinancerAI() {
                                         finalReplyText = "Aqui está o gráfico solicitado: 📊";
                                     }
                                 }
-
                                 if (extractedGoogleChartConfig.height && typeof extractedGoogleChartConfig.height === 'number') {
                                      extractedGoogleChartConfig.height = `${extractedGoogleChartConfig.height}px`;
                                 } else if (extractedGoogleChartConfig.height && typeof extractedGoogleChartConfig.height !== 'string') {
@@ -671,7 +787,7 @@ export default function WalkerTECHFinancerAI() {
                             }
                         }
                     } catch (e) {
-                        console.warn("AI response was not valid JSON or did not contain google_chart_config, using raw text:", e);
+                        console.warn("AI response did not contain valid JSON for google_chart_config, or parsing failed. Using raw text. Error:", e);
                     }
 
                     finalizeAiMessage(aiMessageId, finalReplyText, false, extractedGoogleChartConfig);
@@ -681,19 +797,21 @@ export default function WalkerTECHFinancerAI() {
             }
 
         } catch (error) {
-            console.error("Error sending message to Google AI:", error);
+            console.error("Error sending message to Google AI:", error, error.stack);
             let errorMessage = "😕 Falha ao comunicar com a IA. Tente novamente.";
+            const effectiveModelDisplayName = AI_MODELS_DISPLAY[effectiveModelName] || effectiveModelName;
+
             if (error.message) errorMessage = `Erro: ${error.message}`;
             if (error.toString().includes("API key not valid")) errorMessage = "🔑 Chave de API inválida. Verifique a chave configurada no .env (EXPO_PUBLIC_GEMINI_API_KEY).";
             else if (error.toString().includes("billing account")) errorMessage = "💳 Problema com a conta de faturamento do Google Cloud. Modelos Pro como 'gemini-2.5-pro-preview' exigem faturamento habilitado.";
             else if (error.toString().includes("quota") || error.toString().includes("doesn't have a free quota tier")) {
-                errorMessage = `🚦 Cota de API excedida ou modelo sem cota gratuita (ex: Gemini 2.5 Pro Preview). Verifique seu plano e uso no Google AI Studio/Cloud Console. Para usar modelos Pro, habilite o faturamento. Detalhes: ${error.message}`;
+                errorMessage = `🚦 Cota de API excedida ou modelo (${effectiveModelDisplayName}) sem cota gratuita. Verifique seu plano e uso no Google AI Studio/Cloud Console. Detalhes: ${error.message}`;
             }
             else if (error.response?.promptFeedback?.blockReason) {
                  errorMessage = `Conteúdo bloqueado pela IA. Razão: ${error.response.promptFeedback.blockReason}`;
             } else if (error.response?.candidates?.[0]?.finishReason === "SAFETY") {
                  errorMessage = "Conteúdo bloqueado pela IA devido a políticas de segurança. 🛡️";
-            } else if (error.response?.candidates?.[0]?.finishReason === "OTHER" || error.response?.candidates?.[0]?.finishReason === "UNKNOWN" || error.response?.candidates?.[0]?.finishReason === "MAX_TOKENS") {
+            } else if (error.response?.candidates?.[0]?.finishReason && error.response.candidates[0].finishReason !== "STOP") {
                 errorMessage = `Resposta da IA interrompida (${error.response.candidates[0].finishReason}). Tente refinar sua pergunta.`;
             }
             finalizeAiMessage(aiMessageId, errorMessage, true, null);
@@ -701,6 +819,7 @@ export default function WalkerTECHFinancerAI() {
             setIsLoading(false);
         }
     };
+
 
     const updateAiMessageStream = (id, chunk) => {
         setMessages(prevMessages =>
@@ -744,6 +863,7 @@ export default function WalkerTECHFinancerAI() {
         setCurrentFile(null);
         pickRandomSuggestions();
         await generateNewClientSessionId();
+        setChatSession(null);
         showView('chat');
     };
 
@@ -754,7 +874,16 @@ export default function WalkerTECHFinancerAI() {
     const onAttachFilePress = async () => {
         try {
             const result = await DocumentPicker.getDocumentAsync({
-                type: ['image/*', 'application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'],
+                type: [
+                    'image/*',
+                    'application/pdf',
+                    'text/plain', 'text/markdown', 'text/csv',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'application/vnd.ms-excel',
+                    'application/zip', 'application/x-zip-compressed',
+                ],
                 copyToCacheDirectory: Platform.OS !== 'web',
             });
             if (result.canceled === false && result.assets && result.assets.length > 0) {
@@ -767,11 +896,13 @@ export default function WalkerTECHFinancerAI() {
                     uri: asset.uri,
                     name: asset.name,
                     mimeType: asset.mimeType || (Platform.OS === 'web' && asset.file ? asset.file.type : 'application/octet-stream'),
+                    size: asset.size,
                     ...(Platform.OS === 'web' && asset.file && { originalFile: asset.file })
                 });
+                console.log("Arquivo selecionado:", asset.name, "MIME Type:", asset.mimeType || (Platform.OS === 'web' && asset.file ? asset.file.type : 'application/octet-stream') );
             }
         } catch (err) {
-            console.warn(err);
+            console.warn("Erro ao selecionar arquivo:", err);
             showErrorToUser("Erro ao selecionar arquivo. 📂");
         }
     };
@@ -804,6 +935,8 @@ export default function WalkerTECHFinancerAI() {
             await AsyncStorage.setItem('selectedBankId', selectedBank.id);
             showErrorToUser("Configurações salvas! 👍");
             if (closeModal) setAppNameDropdownVisible(false);
+            setChatSession(null);
+            console.log("App settings saved, chat session will be restarted on next message.");
         } catch (e) { console.error("Failed to save app settings", e); showErrorToUser("Erro ao salvar configurações. 💾");}
     };
 
@@ -819,6 +952,7 @@ export default function WalkerTECHFinancerAI() {
         try {
             await AsyncStorage.setItem('userProfile', JSON.stringify(userProfile));
             showErrorToUser("Perfil salvo! 👤");
+            setChatSession(null);
         } catch (e) { console.error("Failed to save user profile", e); showErrorToUser("Erro ao salvar perfil. 💾"); }
     };
     const loadAnalysisPrefs = async () => {
@@ -833,20 +967,42 @@ export default function WalkerTECHFinancerAI() {
         try {
             await AsyncStorage.setItem('analysisPreferences', JSON.stringify(analysisPreferences));
             showErrorToUser("Preferências salvas! 📊");
+            setChatSession(null);
         } catch (e) { console.error("Failed to save analysis preferences", e); showErrorToUser("Erro ao salvar preferências. 💾"); }
     };
 
     const saveCurrentChatToHistory = async () => {
         if (messages.length > 0 && currentSessionId) {
+            // Filter messages to save: exclude AI's empty streaming messages if no text was ever added.
+            const messagesToSave = messages.filter(m => {
+                if (m.sender === 'ai' && m.isStreaming && !m.text) return false; // Don't save purely placeholder AI messages
+                return true;
+            }).map(m => ({ ...m, isStreaming: false })); // Ensure streaming is false for all saved
+
+            if (messagesToSave.length === 0 && !messages.find(m => m.sender === 'user' && (m.text || m.fileInfo))) {
+                 // If only an empty AI stream was there and no user input, don't save
+                return;
+            }
+
+
             let historyStore = JSON.parse(await AsyncStorage.getItem('chatHistory') || '[]');
-            const firstUserMessage = messages.find(m => m.sender === 'user' && m.text);
-            const chatTitle = firstUserMessage ? (firstUserMessage.text.substring(0, 35) + (firstUserMessage.text.length > 35 ? '...' : '')) : `Chat de ${new Date().toLocaleTimeString()}`;
+            // Find first *actual text* from user for title, or first file name
+            const firstUserMessageWithText = messagesToSave.find(m => m.sender === 'user' && m.text && !(m.fileInfo && m.text.startsWith("Arquivo:")));
+            const firstUserFileMessage = messagesToSave.find(m => m.sender === 'user' && m.fileInfo);
+
+            let chatTitle = `Chat de ${new Date().toLocaleTimeString()}`;
+            if (firstUserMessageWithText) {
+                chatTitle = firstUserMessageWithText.text.substring(0, 35) + (firstUserMessageWithText.text.length > 35 ? '...' : '');
+            } else if (firstUserFileMessage) {
+                 chatTitle = `Chat com ${firstUserFileMessage.fileInfo.name.substring(0, 25)}...`;
+            }
+
 
             const chatEntry = {
                 id: currentSessionId,
                 title: chatTitle,
                 date: new Date().toISOString(),
-                messages: messages.map(m => ({ ...m, isStreaming: false })),
+                messages: messagesToSave,
                 selectedBankId: selectedBank.id,
                 selectedAiModelKey: selectedAiModelKey,
                 enableDeepResearch: enableDeepResearch,
@@ -878,6 +1034,7 @@ export default function WalkerTECHFinancerAI() {
         const bank = banksData.find(b => b.id === historyItem.selectedBankId);
         setSelectedBank(bank || banksData[0]);
         setChatSession(null);
+        pickRandomSuggestions();
         showView('chat');
     };
     const deleteHistoryItem = async (historyId) => {
@@ -892,14 +1049,16 @@ export default function WalkerTECHFinancerAI() {
     const clearAllHistory = async () => {
         await AsyncStorage.removeItem('chatHistory');
         setHistoryItems([]);
-        if (currentView === 'history') {
-             handleNewChat(true);
+        if (currentView === 'history' || messages.length > 0) {
+             handleNewChat(currentView !== 'history');
         }
         showErrorToUser("Histórico de chats apagado. 🗑️");
     };
 
     const renderMessageItem = ({ item, index }) => {
         const isUser = item.sender === 'user';
+        const colors = themes[themeMode]; // Ensure colors are accessible for styles
+
         const markdownStyles = {
             body: { color: isUser ? colors.messageUserText : colors.messageAiText, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'JetBrainsMono-Regular' },
             link: { color: colors.accentSecondary, textDecorationLine: 'underline', fontWeight: 'bold', fontFamily: 'JetBrainsMono-Bold' },
@@ -911,54 +1070,20 @@ export default function WalkerTECHFinancerAI() {
             heading6: { color: isUser ? colors.messageUserText : colors.textSecondary, fontWeight: '600', fontSize: scaleFont(15), marginTop:scale(8), marginBottom:scale(3), fontFamily: 'JetBrainsMono-Bold'},
             code_inline: { backgroundColor: isUser ? 'rgba(0,0,0,0.2)' : colors.bgElevation1, paddingHorizontal: scale(6), paddingVertical: scale(3), borderRadius: scale(6), fontFamily: 'JetBrainsMono-Regular', fontSize: scaleFont(14.5) },
             code_block: { backgroundColor: isUser ? 'rgba(0,0,0,0.2)' : colors.bgElevation1, padding: scale(14), borderRadius: scale(8), fontFamily: 'JetBrainsMono-Regular', marginVertical: scale(10), fontSize: scaleFont(14.5), borderWidth: 1, borderColor: colors.borderColor },
-
-            table: {
-                borderColor: colors.borderColor,
-                borderWidth: 1,
-                borderRadius: scale(8),
-                marginVertical: scale(14),
-                overflow: 'hidden',
-            },
+            table: { borderColor: colors.borderColor, borderWidth: 1, borderRadius: scale(8), marginVertical: scale(14), overflow: 'hidden'},
             thead: {},
-            th: {
-                flex: 1,
-                backgroundColor: colors.bgTertiary,
-                padding: scale(10),
-                color: colors.textPrimary,
-                fontWeight: 'bold',
-                fontFamily: 'JetBrainsMono-Bold',
-                textAlign: 'left',
-            },
+            th: { flex: 1, backgroundColor: colors.bgTertiary, padding: scale(10), color: colors.textPrimary, fontWeight: 'bold', fontFamily: 'JetBrainsMono-Bold', textAlign: 'left'},
             tbody: {},
-            tr: {
-                flexDirection: 'row',
-                borderBottomWidth: 1,
-                borderColor: colors.dividerColor,
-            },
-            td: {
-                flex: 1,
-                padding: scale(10),
-                color: colors.textPrimary,
-                fontFamily: 'JetBrainsMono-Regular',
-                textAlign: 'left',
-            },
-
+            tr: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.dividerColor},
+            td: { flex: 1, padding: scale(10), color: colors.textPrimary, fontFamily: 'JetBrainsMono-Regular', textAlign: 'left'},
             list_item: { marginVertical: scale(5), flexDirection: 'row', alignItems: 'flex-start'},
             bullet_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: Platform.OS === 'ios' ? scaleFont(12) : scaleFont(18), lineHeight: scaleFont(25), fontWeight: 'bold' },
             ordered_list_icon: { marginRight: scale(10), color: colors.accentPrimary, fontSize: scaleFont(16), lineHeight: scaleFont(25), fontFamily: 'JetBrainsMono-Bold' },
             strong: {fontFamily: 'JetBrainsMono-Bold', fontWeight: 'bold'},
             em: {fontFamily: 'JetBrainsMono-Regular', fontStyle: 'italic'},
-            blockquote: {
-                backgroundColor: colors.bgTertiary,
-                paddingHorizontal: scale(15),
-                paddingVertical: scale(12),
-                marginVertical: scale(10),
-                borderLeftWidth: scale(5),
-                borderLeftColor: colors.accentPrimary,
-                borderRadius: scale(6),
-            },
+            blockquote: { backgroundColor: colors.bgTertiary, paddingHorizontal: scale(15), paddingVertical: scale(12), marginVertical: scale(10), borderLeftWidth: scale(5), borderLeftColor: colors.accentPrimary, borderRadius: scale(6)},
             hr: { backgroundColor: colors.dividerColor, height: 1, marginVertical: scale(15) },
-            image: { marginVertical: scale(10), borderRadius: scale(8) },
+            image: { marginVertical: scale(10), borderRadius: scale(8), maxWidth: '100%' },
         };
 
         const messageContainerStyle = [
@@ -966,13 +1091,6 @@ export default function WalkerTECHFinancerAI() {
             isUser ? styles.userMessageBubble(colors) : styles.aiMessageBubble(colors),
             item.isError ? styles.errorMessageBubble(colors) : {}
         ];
-
-        let messageContent = item.text;
-        if (item.fileInfo && !item.text) {
-            messageContent = `📎 Arquivo: ${item.fileInfo.name}`;
-        } else if (item.fileInfo && item.text && item.text.startsWith(`Arquivo: ${item.fileInfo.name}`)) {
-            // Text already includes file info
-        }
 
         return (
             <Animatable.View
@@ -985,12 +1103,27 @@ export default function WalkerTECHFinancerAI() {
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     {!isUser && <MaterialCommunityIcons name="robot-happy-outline" size={scale(24)} color={colors.accentPrimary} style={{ marginRight: scale(10), marginTop: scale(3) }} />}
                     <View style={{ flex: 1 }}>
-                        {messageContent && (
-                            <Markdown style={markdownStyles} onLinkPress={(url) => { Linking.openURL(url); return false; }}>
-                                {messageContent + (item.isStreaming && !item.isError ? '▍' : '')}
-                            </Markdown>
+                        {/* Prepare content for Markdown display */}
+                        {(() => {
+                            const actualTextContent = (typeof item.text === 'string') ? item.text : '';
+                            const showStreamingCursor = item.isStreaming && !item.isError && item.sender === 'ai';
+
+                            if (actualTextContent.length > 0 || showStreamingCursor) {
+                                return (
+                                    <Markdown style={markdownStyles} onLinkPress={(url) => { Linking.openURL(url); return false; }}>
+                                        {actualTextContent + (showStreamingCursor ? '▍' : '')}
+                                    </Markdown>
+                                );
+                            }
+                            return null; // Return null if no text and no cursor
+                        })()}
+
+                        {/* Render the error message if any */}
+                        {item.isError && (
+                            <Text style={{color: colors.danger, marginTop: scale(6), fontStyle: 'italic', fontSize: scaleFont(14), fontFamily: 'JetBrainsMono-Regular'}}>
+                                Erro ao processar.
+                            </Text>
                         )}
-                        {item.isError && <Text style={{color: colors.danger, marginTop: scale(6), fontStyle: 'italic', fontSize: scaleFont(14), fontFamily: 'JetBrainsMono-Regular'}}>Erro ao processar.</Text>}
                     </View>
                     {isUser && <MaterialIcons name="account-circle" size={scale(24)} color={colors.messageUserText} style={{ marginLeft: scale(10), marginTop: scale(3) }} />}
                 </View>
@@ -1006,6 +1139,7 @@ export default function WalkerTECHFinancerAI() {
             </Animatable.View>
         );
     };
+
 
     const renderSuggestionCard = ({ item, index }) => (
         <Animatable.View animation="zoomIn" duration={500} delay={index * 120} useNativeDriver={Platform.OS !== 'web'}>
@@ -1298,7 +1432,7 @@ export default function WalkerTECHFinancerAI() {
                         placeholderTextColor={colors.textPlaceholder}
                         multiline
                         editable={!isLoading}
-                        textAlignVertical="top"
+                        textAlignVertical="top" // Better for multiline
                     />
                     <TouchableOpacity
                         onPress={() => handleSendMessage()}
@@ -1360,6 +1494,7 @@ export default function WalkerTECHFinancerAI() {
                         pickRandomSuggestions();
                         await generateNewClientSessionId();
                         showView('chat');
+                        // initializeApp(); // Re-initialize may not be necessary if state resets cover everything
                     }} activeOpacity={0.7}>
                         <MaterialIcons name="logout" size={scale(26)} color={colors.danger} />
                         <Text style={[styles.menuItemText(colors), {color: colors.danger}]}>Sair (Limpar Tudo)</Text>
@@ -1409,14 +1544,14 @@ export default function WalkerTECHFinancerAI() {
                                 selectedValue={selectedAiModelKey}
                                 onValueChange={(itemValue) => setSelectedAiModelKey(itemValue)}
                                 style={styles.pickerStyle(colors)}
-                                itemStyle={styles.pickerItemStyle(colors)}
+                                itemStyle={styles.pickerItemStyle(colors)} // For iOS specifically
                                 dropdownIconColor={colors.textPrimary}
                                 mode="dropdown"
                             >
                                 {Object.entries(GEMINI_MODEL_MAPPING).map(([key, modelId]) => (
                                     <Picker.Item
                                         key={key}
-                                        label={AI_MODELS_DISPLAY[modelId] || key}
+                                        label={AI_MODELS_DISPLAY[modelId] || key.replace(/_/g, ' ')}
                                         value={key}
                                         color={(Platform.OS === 'android' || Platform.OS === 'web') ? colors.textPrimary : undefined}
                                     />
@@ -1456,6 +1591,7 @@ export default function WalkerTECHFinancerAI() {
                                     onPress={() => {
                                         setSelectedBank(item);
                                         setBankModalVisible(false);
+                                        setChatSession(null);
                                     }}
                                     activeOpacity={0.7}
                                 >
@@ -1480,7 +1616,7 @@ export default function WalkerTECHFinancerAI() {
         <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : (Platform.OS === "web" ? undefined : "height")}
             style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : (Platform.OS === 'web' ? 0 : (StatusBar.currentHeight || 0) )}
         >
             <View style={styles.appContainer(colors)}>
                 <StatusBar barStyle={colors.statusBar} backgroundColor={colors.bgPrimary} />
@@ -1601,7 +1737,7 @@ const styles = StyleSheet.create({
         borderBottomLeftRadius: scale(6),
     }),
     errorMessageBubble: (colors) => ({
-        backgroundColor: colors.danger + '2A',
+        backgroundColor: hexToRgba(colors.danger, 0.15),
         borderColor: colors.danger,
         borderWidth: 1.5
     }),
@@ -1639,6 +1775,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(20),
         paddingVertical: scale(25),
         width: '100%',
+        maxWidth: scale(800),
     }),
     greetingMainText: (colors) => ({
         fontSize: scaleFont(screenWidth > 400 ? 44 : 38),
@@ -1668,15 +1805,14 @@ const styles = StyleSheet.create({
     suggestionCardsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'center', // Center items horizontally
-        alignItems: 'center',     // Center items vertically if they wrap (useful if heights varied)
+        justifyContent: 'center',
+        alignItems: 'flex-start',
         width: '100%',
     },
     suggestionCardWrapper: {
-        margin: scale(8), // Uniform margin around each card for minimal spacing
-        // alignItems: 'center', // Card has fixed width, wrapper will shrink. Not strictly needed.
+        margin: scale(8),
     },
-    suggestionCard: (colors, borderColor) => ({ // The card itself
+    suggestionCard: (colors, borderColor) => ({
         backgroundColor: colors.bgCard,
         borderRadius: scale(18),
         padding: scale(18),
@@ -1684,11 +1820,13 @@ const styles = StyleSheet.create({
         borderColor: borderColor,
         flexDirection: 'column',
         alignItems: 'flex-start',
-        width: scale(180), // Fixed width for square
-        height: scale(180), // Fixed height for square
+        width: scale(180),
+        height: scale(180),
         justifyContent: 'space-between',
         ...(Platform.OS === 'web' ? {
             boxShadow: `0px ${scale(4)}px ${scale(6)}px ${hexToRgba(colors.shadowColor, colors.shadowOpacity)}`,
+            transition: 'transform 0.2s ease-in-out, boxShadow 0.2s ease-in-out',
+            cursor: 'pointer',
         } : {
             shadowColor: colors.shadowColor,
             shadowOffset: { width: 0, height: scale(4) },
@@ -1780,7 +1918,7 @@ const styles = StyleSheet.create({
         maxHeight: scale(125),
         fontFamily: 'JetBrainsMono-Regular',
         lineHeight: scaleFont(22),
-        ...(Platform.OS === 'web' && { outline: 'none', resize: 'none' }),
+        ...(Platform.OS === 'web' && { outline: 'none', resize: 'none', width: '100%' }),
     }),
     inputIconButton: () => ({
         padding: scale(12),
@@ -1802,7 +1940,7 @@ const styles = StyleSheet.create({
             elevation: 3,
         }),
     }),
-    sendButtonDisabled: (colors) => ({ backgroundColor: colors.textPlaceholder, opacity: 0.7 }),
+    sendButtonDisabled: (colors) => ({ backgroundColor: colors.iconMuted, opacity: 0.7 }),
 
     footerContainer: (colors) => ({
         paddingVertical: scale(14),
@@ -1882,7 +2020,7 @@ const styles = StyleSheet.create({
     menuItem: (colors, isActive = false) => ({
         flexDirection: 'row', alignItems: 'center',
         paddingVertical: scale(16), paddingHorizontal: scale(22),
-        backgroundColor: isActive ? colors.accentPrimary + '33' : 'transparent',
+        backgroundColor: isActive ? hexToRgba(colors.accentPrimary, 0.2) : 'transparent',
         borderRadius: isActive ? scale(14) : 0,
         marginHorizontal: isActive ? scale(12) : 0,
         marginBottom: scale(6),
@@ -1899,7 +2037,7 @@ const styles = StyleSheet.create({
     modalTitle: (colors) => ({ fontSize: scaleFont(23), fontWeight: 'bold', color: colors.textPrimary, marginBottom: scale(28), textAlign: 'center', paddingHorizontal:scale(18), fontFamily: 'JetBrainsMono-Bold' }),
 
     settingItem: (colors, noBorder = false) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scale(20), paddingHorizontal:scale(22), borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: colors.dividerColor }),
-    settingItemModal: (colors, noBorder = false) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scale(16), paddingHorizontal:scale(22), borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: colors.dividerColor + 'AA', width: '100%' }),
+    settingItemModal: (colors, noBorder = false) => ({ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: scale(16), paddingHorizontal:scale(22), borderBottomWidth: noBorder ? 0 : 1, borderBottomColor: hexToRgba(colors.dividerColor, 0.7), width: '100%' }),
     settingIcon: () => ({ marginRight: scale(20) }),
     settingLabel: (colors) => ({ fontSize: scaleFont(16.5), color: colors.textPrimary, flex: 1, fontFamily: 'JetBrainsMono-Regular' }),
     themeToggleButton: (colors) => ({ paddingVertical: scale(11), paddingHorizontal: scale(16), backgroundColor: colors.accentPrimary, borderRadius: scale(28), minWidth: scale(125), alignItems:'center', ...(Platform.OS === 'web' ? {
@@ -1917,7 +2055,7 @@ const styles = StyleSheet.create({
         width:'100%',
         fontSize: scaleFont(15.5),
         fontFamily: 'JetBrainsMono-Regular',
-        ...(Platform.OS === 'web' && { border: 'none', background: 'transparent', paddingLeft: 12, paddingRight: 12, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' })
+        ...(Platform.OS === 'web' && { border: 'none', background: 'transparent', paddingLeft: 12, paddingRight: 12, appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none', cursor:'pointer' })
     }),
     pickerItemStyle: (colors) => ({
         color: colors.textPrimary,
@@ -1940,7 +2078,7 @@ const styles = StyleSheet.create({
         backgroundColor: colors.bgSecondary,
         ...(Platform.OS === 'web' && {
             overflowY: 'auto',
-            height: `calc(100vh - ${scale(75)}px)`
+            height: `calc(100vh - ${scale(75)}px)` // Adjust for top bar height
         })
     }),
     panelScrollView: (colors) => ({
@@ -1967,7 +2105,7 @@ const styles = StyleSheet.create({
         }) }),
     historyItemTitle: (colors) => ({ fontSize:scaleFont(16.5), fontWeight:'bold', color:colors.textPrimary, marginBottom:scale(5), fontFamily: 'JetBrainsMono-Bold' }),
     historyItemDate: (colors) => ({ fontSize:scaleFont(12.5), color:colors.textSecondary, fontFamily: 'JetBrainsMono-Regular' }),
-    clearHistoryButton: (colors) => ({ flexDirection:'row', alignItems:'center', paddingVertical:scale(8), paddingHorizontal:scale(14), borderRadius:scale(22), backgroundColor: colors.danger + '2A'}),
+    clearHistoryButton: (colors) => ({ flexDirection:'row', alignItems:'center', paddingVertical:scale(8), paddingHorizontal:scale(14), borderRadius:scale(22), backgroundColor: hexToRgba(colors.danger, 0.15)}),
     clearHistoryButtonText: (colors) => ({ color: colors.danger, fontSize:scaleFont(13.5), marginLeft:scale(8), fontWeight:'bold', fontFamily: 'JetBrainsMono-Bold'}),
     emptyStateContainer: () => ({ flex:1, justifyContent:'center', alignItems:'center', padding:scale(25) }),
     emptyStateText: (colors) => ({ fontSize:scaleFont(17.5), color:colors.textPlaceholder, marginTop:scale(18), textAlign:'center', fontFamily: 'JetBrainsMono-Regular', lineHeight: scaleFont(25) }),
@@ -1997,24 +2135,26 @@ const styles = StyleSheet.create({
         ...(Platform.OS === 'web' && { backgroundColor: 'transparent', border: 'none', outline: 'none' })
     }),
 
-    bankListItem: (colors) => ({
+    bankListItem: (colors, isSelected) => ({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: scale(16),
         paddingHorizontal: scale(20),
         borderRadius: scale(14),
-        backgroundColor: colors.bgTertiary,
+        backgroundColor: isSelected ? hexToRgba(colors.accentPrimary, 0.15) : colors.bgTertiary,
         marginBottom: scale(12),
+        borderWidth: isSelected ? 1.5 : 0,
+        borderColor: isSelected ? colors.accentPrimary : 'transparent',
     }),
     bankLogo: (colors) => ({ width: scale(44), height: scale(44), borderRadius: scale(22), marginRight: scale(20), backgroundColor: colors.bgWhite, padding: scale(2), borderWidth:1, borderColor: colors.borderColor }),
-    bankName: (colors) => ({
+    bankName: (colors, isSelected) => ({
         flex: 1,
         fontSize: scaleFont(16.5),
-        color: colors.textPrimary,
-        fontWeight: '500',
-        fontFamily: 'JetBrainsMono-Medium',
+        color: isSelected ? colors.accentPrimary : colors.textPrimary,
+        fontWeight: isSelected ? 'bold' : '500',
+        fontFamily: isSelected ? 'JetBrainsMono-Bold' : 'JetBrainsMono-Medium',
     }),
-    bankListSeparator: (colors) => ({ height: 1.5, backgroundColor: colors.dividerColor, marginVertical: scale(5) }),
+    bankListSeparator: (colors) => ({ height: 1.5, backgroundColor: hexToRgba(colors.dividerColor, 0.5), marginVertical: scale(5) }),
     infoText: (colors) => ({
         color: colors.textSecondary,
         fontSize: scaleFont(14.5),
